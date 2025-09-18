@@ -1,21 +1,32 @@
 package authservice
 
 import (
+	"log/slog"
+
 	"github.com/sibhellyx/Messenger/internal/db"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 )
 
 type AuthService struct {
 	repository *db.Repository
+	logger     *slog.Logger
 }
 
-func NewAuthService(repository *db.Repository) *AuthService {
+func NewAuthService(repository *db.Repository, logger *slog.Logger) *AuthService {
 	return &AuthService{
 		repository: repository,
+		logger:     logger,
 	}
 }
 
+// register user service layer
 func (s *AuthService) RegisterUser(user entity.User) error {
-	err := user.Validate()
-	return err
+	s.logger.Debug("service register started")
+	err := user.Validate() //function return error if user not isValid
+	if err != nil {
+		s.logger.Error("error validating user input", "error", err.Error())
+		return err
+	}
+	s.logger.Debug("service register completed")
+	return nil
 }

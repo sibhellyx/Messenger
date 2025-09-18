@@ -62,7 +62,7 @@ func (srv *Server) Serve() {
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db)
 	srv.logger.Debug("connecting to auth service")
-	authService := authservice.NewAuthService(repository)
+	authService := authservice.NewAuthService(repository, srv.logger)
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 

@@ -21,6 +21,7 @@ func (User) TableName() string {
 	return "users"
 }
 
+// validating input for registratiom
 func (user User) Validate() error {
 	slog.Debug("validating user registration")
 	if user.Name == "" {
