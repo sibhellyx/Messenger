@@ -26,7 +26,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		WrapError(c, err)
 		return
 	}
-
+	err = h.service.RegisterUser(user)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "created",
 	})
