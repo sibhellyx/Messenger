@@ -1,0 +1,77 @@
+package app
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+
+	"github.com/sibhellyx/Messenger/api"
+	"github.com/sibhellyx/Messenger/internal/config"
+	"github.com/sibhellyx/Messenger/internal/db"
+	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
+	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+type Server struct {
+	ctx    context.Context
+	cfg    config.Config
+	srv    *http.Server
+	db     *gorm.DB
+	logger *slog.Logger
+}
+
+func NewServer(ctx context.Context, cfg config.Config) *Server {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	slog.SetDefault(logger)
+
+	srv := &Server{
+		ctx:    ctx,
+		cfg:    cfg,
+		logger: logger,
+	}
+
+	return srv
+}
+
+func (srv *Server) Serve() {
+	srv.logger.Info("starting server", "port", srv.cfg.Port)
+
+	srv.logger.Debug("connecting to database")
+	database, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  srv.cfg.GetDbString(),
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{})
+	if err != nil {
+		srv.logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	srv.db = database
+
+	srv.logger.Debug("connecting to auth repository")
+	repository := db.NewRepository(srv.db)
+	srv.logger.Debug("connecting to auth service")
+	authService := authservice.NewAuthService(repository)
+	srv.logger.Debug("connecting to auth handler")
+	authHandler := authhandler.NewAuthHandler(authService)
+
+	srv.logger.Debug("creating routes")
+	routes := api.CreateRoutes(authHandler)
+
+	srv.logger.Debug("init server")
+	srv.srv = &http.Server{
+		Addr:    ":" + srv.cfg.Port,
+		Handler: routes,
+	}
+
+	srv.logger.Info("starting HTTP server", "port", srv.cfg.Port)
+	if err := srv.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		srv.logger.Error("HTTP server error - shutting down", "error", err)
+		os.Exit(1)
+	}
+
+}
