@@ -53,6 +53,12 @@ func (srv *Server) Serve() {
 	}
 	srv.db = database
 
+	err = db.Migrate(srv.db, srv.logger)
+	if err != nil {
+		srv.logger.Error("failed to migrate database", "error", err)
+		os.Exit(1)
+	}
+
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db)
 	srv.logger.Debug("connecting to auth service")
