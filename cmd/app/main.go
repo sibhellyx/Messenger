@@ -23,7 +23,7 @@ func main() {
 	server := app.NewServer(ctx, cfg)
 	go func() {
 		<-sigChan
-		// server.Shutdown()
+		server.Shutdown()
 		cancel()
 	}()
 

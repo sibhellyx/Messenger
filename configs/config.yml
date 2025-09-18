@@ -1,6 +1,6 @@
 PORT: "8080"
 DB_NAME: "db"
-DB_USER: "user"
+DB_USER: "sibhelly"
 DB_HOST: "localhost"
-DB_PORT: "9920"
+DB_PORT: "5432"
 DB_PASS: "password"

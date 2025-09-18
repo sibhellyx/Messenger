@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/sibhellyx/Messenger/api"
 	"github.com/sibhellyx/Messenger/internal/config"
@@ -71,6 +72,18 @@ func (srv *Server) Serve() {
 	srv.logger.Info("starting HTTP server", "port", srv.cfg.Port)
 	if err := srv.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		srv.logger.Error("HTTP server error - shutting down", "error", err)
+		os.Exit(1)
+	}
+	srv.logger.Info("HTTP server stopped")
+}
+
+func (srv *Server) Shutdown() {
+	slog.Info("server stopping...")
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := srv.srv.Shutdown(ctxShutdown)
+	if err != nil {
+		srv.logger.Error("HTTP server shutdown error", "error", err)
 		os.Exit(1)
 	}
 
