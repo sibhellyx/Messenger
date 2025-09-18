@@ -12,6 +12,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
+	"github.com/sibhellyx/Messenger/pkg/hash"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -58,11 +59,12 @@ func (srv *Server) Serve() {
 		srv.logger.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
+	hasher := hash.NewHasher("salt")
 
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db)
 	srv.logger.Debug("connecting to auth service")
-	authService := authservice.NewAuthService(repository, srv.logger)
+	authService := authservice.NewAuthService(repository, srv.logger, hasher)
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 

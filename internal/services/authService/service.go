@@ -5,17 +5,20 @@ import (
 
 	"github.com/sibhellyx/Messenger/internal/db"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
+	"github.com/sibhellyx/Messenger/pkg/hash"
 )
 
 type AuthService struct {
 	repository *db.Repository
 	logger     *slog.Logger
+	hasher     *hash.Hasher
 }
 
-func NewAuthService(repository *db.Repository, logger *slog.Logger) *AuthService {
+func NewAuthService(repository *db.Repository, logger *slog.Logger, hasher *hash.Hasher) *AuthService {
 	return &AuthService{
 		repository: repository,
 		logger:     logger,
+		hasher:     hasher,
 	}
 }
 
