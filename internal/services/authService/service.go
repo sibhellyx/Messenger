@@ -1,6 +1,8 @@
 package authservice
 
-import "github.com/sibhellyx/Messenger/internal/db"
+import (
+	"github.com/sibhellyx/Messenger/internal/db"
+)
 
 type AuthService struct {
 	repository *db.Repository
