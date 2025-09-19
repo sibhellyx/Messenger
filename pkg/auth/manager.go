@@ -16,8 +16,11 @@ type Manager struct {
 	logger     *slog.Logger
 }
 
-func NewManager(singingKey string) *Manager {
-	return &Manager{signingKey: singingKey}
+func NewManager(singingKey string, logger *slog.Logger) *Manager {
+	return &Manager{
+		signingKey: singingKey,
+		logger:     logger,
+	}
 }
 
 func (m *Manager) NewJWT(payload payload.JwtPayload, ttl time.Duration) (string, error) {

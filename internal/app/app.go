@@ -61,7 +61,7 @@ func (srv *Server) Serve() {
 		os.Exit(1)
 	}
 	hasher := hash.NewHasher("salt")
-	manager := auth.NewManager("some-auth-manager")
+	manager := auth.NewManager("some-auth-manager", srv.logger)
 
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db, srv.logger)

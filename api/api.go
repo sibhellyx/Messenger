@@ -13,6 +13,9 @@ func CreateRoutes(authHandler *authhandler.AuthHandler, logger *slog.Logger) *gi
 	r.Use(middleware.LoggingMiddleware(logger))
 
 	r.POST("/register", authHandler.Register)
+	r.POST("/login", authHandler.SignIn)
+	r.POST("/refresh", authHandler.RefreshToken)
+	// r.POST("/logout")
 
 	return r
 }

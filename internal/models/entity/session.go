@@ -12,7 +12,7 @@ type Session struct {
 	gorm.Model
 	UserID       uint      `gorm:"not null;index" json:"user_id"`
 	UUID         uuid.UUID `gorm:"type:uuid;not null;unique_index" json:"uuid"`
-	RefreshToken string    `gorm:"size:255" json:"-"`
+	RefreshToken string    `gorm:"size:255" json:"refresh_token"`
 	ExpiresAt    time.Time `gorm:"type:timestamptz" json:"expires_at"`
 	UserAgent    string    `gorm:"size:255" json:"user_agent"`
 	LastIP       string    `gorm:"size:255" json:"last_ip"`
