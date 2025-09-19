@@ -62,6 +62,11 @@ func (s *AuthService) RegisterUser(user entity.User) error {
 
 func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error) {
 	s.logger.Debug("service login started")
+	err := user.Validate()
+	if err != nil {
+		s.logger.Error("error validating user input", "error", err.Error())
+		return response.Tokens{}, err
+	}
 	passwordHash, err := s.hasher.Hash(user.Password) //hash password
 	if err != nil {
 		s.logger.Error("failed hash password", "error", err.Error())
@@ -77,6 +82,11 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 
 func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginParams) (response.Tokens, error) {
 	s.logger.Debug("service refresh token started")
+	err := tokens.Validate()
+	if err != nil {
+		s.logger.Error("error validating tokens", "error", err.Error())
+		return response.Tokens{}, err
+	}
 	refreshTokenHash := s.hasher.HashRefreshToken(tokens.RefreshToken)
 
 	payload, err := s.tokenManager.Parse(tokens.AccessToken)
