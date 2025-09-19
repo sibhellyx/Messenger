@@ -32,7 +32,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"message": "created",
+		"result": "user created",
 	})
 
 }

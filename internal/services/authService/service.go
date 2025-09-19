@@ -30,6 +30,16 @@ func (s *AuthService) RegisterUser(user entity.User) error {
 		s.logger.Error("error validating user input", "error", err.Error())
 		return err
 	}
+	user.Password, err = s.hasher.Hash(user.Password) //hash password
+	if err != nil {
+		s.logger.Error("failed hash password", "error", err.Error())
+		return err
+	}
+	err = s.repository.CreateUser(user) //write to repo
+	if err != nil {
+		s.logger.Error("failed create user in repo", "error", err.Error())
+		return err
+	}
 	s.logger.Debug("service register completed")
 	return nil
 }
