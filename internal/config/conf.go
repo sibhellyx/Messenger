@@ -17,6 +17,9 @@ type Config struct {
 	DBhost     string `mapstructure:"DB_HOST"`
 	DBport     string `mapstructure:"DB_PORT"`
 	DBpassword string `mapstructure:"DB_PASS"`
+	//for tokens
+	AccessTTL  int `mapstructure:"ACCESS_TTL"`
+	RefreshTTL int `mapstructure:"REFRESH_TTL"`
 }
 
 func LoadConfig() Config {
@@ -36,6 +39,8 @@ func LoadConfig() Config {
 	v.SetDefault("DB_HOST", "localhost")
 	v.SetDefault("DB_PORT", "9920")
 	v.SetDefault("DB_PASS", "password")
+	v.SetDefault("ACCESS_TTL", 15)
+	v.SetDefault("REFRESH_TTL", 10)
 
 	var cfg Config
 

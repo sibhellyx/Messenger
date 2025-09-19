@@ -2,9 +2,11 @@ package authservice
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/db"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
+	"github.com/sibhellyx/Messenger/pkg/auth"
 	"github.com/sibhellyx/Messenger/pkg/hash"
 )
 
@@ -12,13 +14,21 @@ type AuthService struct {
 	repository *db.Repository
 	logger     *slog.Logger
 	hasher     *hash.Hasher
+
+	tokenManager *auth.Manager
+
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
-func NewAuthService(repository *db.Repository, logger *slog.Logger, hasher *hash.Hasher) *AuthService {
+func NewAuthService(repository *db.Repository, logger *slog.Logger, hasher *hash.Hasher, manager *auth.Manager, accessTokenTTL, refreshTokenTTL time.Duration) *AuthService {
 	return &AuthService{
-		repository: repository,
-		logger:     logger,
-		hasher:     hasher,
+		repository:      repository,
+		logger:          logger,
+		hasher:          hasher,
+		tokenManager:    manager,
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
 	}
 }
 

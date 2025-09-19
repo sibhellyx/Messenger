@@ -12,6 +12,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
+	"github.com/sibhellyx/Messenger/pkg/auth"
 	"github.com/sibhellyx/Messenger/pkg/hash"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -60,11 +61,12 @@ func (srv *Server) Serve() {
 		os.Exit(1)
 	}
 	hasher := hash.NewHasher("salt")
+	manager := auth.NewManager("some-auth-manager")
 
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db, srv.logger)
 	srv.logger.Debug("connecting to auth service")
-	authService := authservice.NewAuthService(repository, srv.logger, hasher)
+	authService := authservice.NewAuthService(repository, srv.logger, hasher, manager, time.Duration(srv.cfg.AccessTTL*int(time.Minute)), time.Duration(srv.cfg.RefreshTTL*int(time.Hour*24)))
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 
