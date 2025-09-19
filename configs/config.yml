@@ -4,3 +4,6 @@ DB_USER: "sibhelly"
 DB_HOST: "localhost"
 DB_PORT: "5432"
 DB_PASS: "password"
+
+ACCESS_TTL: 15
+REFRESH_TTL: 10
