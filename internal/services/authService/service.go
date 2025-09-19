@@ -7,27 +7,45 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sibhellyx/Messenger/internal/db"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/payload"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 	"github.com/sibhellyx/Messenger/internal/models/response"
-	"github.com/sibhellyx/Messenger/pkg/auth"
-	"github.com/sibhellyx/Messenger/pkg/hash"
 )
 
-type AuthService struct {
-	repository *db.Repository
-	logger     *slog.Logger
-	hasher     *hash.Hasher
+type RepositoryInterface interface {
+	CreateSession(session entity.Session) error
+	CreateUser(user entity.User) error
+	DeleteSessionByUuid(uuid string) error
+	FindJwtSessionByUuidAndRefreshToken(uuid string, refreshToken string) (*entity.Session, error)
+	GetUserByCredentails(tgname string, password string) (*entity.User, error)
+	UpdateSession(session entity.Session) error
+}
 
-	tokenManager *auth.Manager
+type HasherInterface interface {
+	Hash(password string) (string, error)
+	HashRefreshToken(refreshToken string) string
+}
+
+type TokenManagerInterface interface {
+	NewJWT(payload payload.JwtPayload, ttl time.Duration) (string, error)
+	NewRefreshToken() (string, error)
+	Parse(accessToken string) (payload.JwtPayload, error)
+}
+
+type AuthService struct {
+	repository RepositoryInterface
+
+	logger *slog.Logger
+
+	hasher       HasherInterface
+	tokenManager TokenManagerInterface
 
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
 }
 
-func NewAuthService(repository *db.Repository, logger *slog.Logger, hasher *hash.Hasher, manager *auth.Manager, accessTokenTTL, refreshTokenTTL time.Duration) *AuthService {
+func NewAuthService(repository RepositoryInterface, logger *slog.Logger, hasher HasherInterface, manager TokenManagerInterface, accessTokenTTL, refreshTokenTTL time.Duration) *AuthService {
 	return &AuthService{
 		repository:      repository,
 		logger:          logger,

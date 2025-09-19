@@ -71,7 +71,7 @@ func (srv *Server) Serve() {
 	authHandler := authhandler.NewAuthHandler(authService)
 
 	srv.logger.Debug("creating routes")
-	routes := api.CreateRoutes(authHandler, srv.logger)
+	routes := api.CreateRoutes(authHandler, srv.logger, manager, repository)
 
 	srv.logger.Debug("init server")
 	srv.srv = &http.Server{

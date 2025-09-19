@@ -90,44 +90,20 @@ func (r *Repository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken stri
 			return nil, errors.New("invalid credentials")
 		}
 		r.logger.Error("database error", "error", result.Error, "uuid", uuid, "refreshToken", refreshToken)
-		return nil, result.Error
+		return nil, errors.New("database error")
 	}
 
 	r.logger.Info("session founded successfully", "uuid", uuid, "refreshToken", refreshToken, "user_id", session.UserID)
 	return &session, nil
 }
 
-// func (r *Repository) DeleteExpiredSessions(userID uint) error {
-// 	return r.db.Where("user_id = ? AND expires_at < ?", userID, time.Now()).
-// 		Delete(&entity.Session{}).Error
-// }
-
-// func (r *Repository) CountActiveSessions(userID uint) (int64, error) {
-// 	var count int64
-// 	err := r.db.Model(&entity.Session{}).
-// 		Where("user_id = ? AND expires_at > ?", userID, time.Now()).
-// 		Count(&count).Error
-// 	return count, err
-// }
-
-// func (r *Repository) DeleteOldestSessions(userID uint, count int) error {
-// 	var sessions []entity.Session
-// 	err := r.db.Where("user_id = ? AND expires_at > ?", userID, time.Now()).
-// 		Order("created_at ASC").
-// 		Limit(count).
-// 		Find(&sessions).Error
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if len(sessions) == 0 {
-// 		return nil
-// 	}
-
-// 	var uuids []uuid.UUID
-// 	for _, s := range sessions {
-// 		uuids = append(uuids, s.UUID)
-// 	}
-
-// 	return r.db.Where("uuid IN ?", uuids).Delete(&entity.Session{}).Error
-// }
+func (r *Repository) CheckSessionByUuid(uuid string) (bool, error) {
+	r.logger.Debug("check session", "uuid", uuid)
+	var count int64
+	err := r.db.Model(&entity.Session{}).Where("uuid = ?", uuid).Count(&count).Error
+	if err != nil {
+		r.logger.Error("error find session by uuid", "error", err.Error())
+		return false, errors.New("failed check session")
+	}
+	return count > 0, nil
+}
