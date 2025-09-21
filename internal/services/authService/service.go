@@ -2,6 +2,7 @@ package authservice
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -20,6 +21,10 @@ type RepositoryInterface interface {
 	FindJwtSessionByUuidAndRefreshToken(uuid string, refreshToken string) (*entity.Session, error)
 	GetUserByCredentails(tgname string, password string) (*entity.User, error)
 	UpdateSession(session entity.Session) error
+	DeleteExpiredSessions(userId uint) error
+	DeleteOldestSession(userId uint) error
+	GetUserByTgname(tgname string) (*entity.User, error)
+	CountActiveSessions(userId uint) (int64, error)
 }
 
 type HasherInterface interface {
@@ -137,6 +142,24 @@ func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginP
 
 func (s *AuthService) createSession(userId uint, params request.LoginParams) (response.Tokens, error) {
 	s.logger.Debug("creating session started")
+
+	// add cheecking old sessions end expired, clear for free limit session
+	if err := s.repository.DeleteExpiredSessions(userId); err != nil {
+		s.logger.Warn("failed to cleanup expired sessions", "error", err)
+	}
+
+	activeCount, err := s.repository.CountActiveSessions(userId)
+	if err != nil {
+		return response.Tokens{}, fmt.Errorf("failed to count active sessions: %w", err)
+	}
+
+	const maxActiveSessions = 5 // add geting from config
+
+	if activeCount >= maxActiveSessions {
+		if err := s.repository.DeleteOldestSession(userId); err != nil {
+			s.logger.Warn("failed to delete oldest session", "error", err)
+		}
+	}
 
 	session := entity.Session{
 		UserID:    userId,

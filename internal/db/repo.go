@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"gorm.io/gorm"
@@ -49,6 +50,20 @@ func (r *Repository) GetUserByCredentails(tgname, password string) (*entity.User
 	}
 
 	r.logger.Info("user authenticated successfully", "user_id", user.ID, "tgname", tgname)
+	return &user, nil
+}
+
+func (r *Repository) GetUserByTgname(tgname string) (*entity.User, error) {
+	var user entity.User
+	result := r.db.Where("tgname = ?", tgname).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			r.logger.Warn("user not found or invalid credentials", "tgname", tgname)
+			return nil, errors.New("invalid credentials")
+		}
+		r.logger.Error("database error", "error", result.Error, "tgname", tgname)
+		return nil, result.Error
+	}
 	return &user, nil
 }
 
@@ -102,8 +117,39 @@ func (r *Repository) CheckSessionByUuid(uuid string) (bool, error) {
 	var count int64
 	err := r.db.Model(&entity.Session{}).Where("uuid = ?", uuid).Count(&count).Error
 	if err != nil {
-		r.logger.Error("error find session by uuid", "error", err.Error())
+		r.logger.Error("database error find session by uuid", "error", err.Error())
 		return false, errors.New("failed check session")
 	}
 	return count > 0, nil
+}
+
+func (r *Repository) DeleteExpiredSessions(userId uint) error {
+	r.logger.Debug("deleting expired sessions", "user_id", userId)
+	return r.db.Where("user_id = ? AND expires_at < ?", userId, time.Now()).
+		Delete(&entity.Session{}).Error
+}
+
+func (r *Repository) DeleteOldestSession(userId uint) error {
+	r.logger.Debug("deleted oldest session", "user_id", userId)
+	var session entity.Session
+	err := r.db.Where("user_id = ?", userId).
+		Order("created_at ASC").
+		First(&session).Error
+	if err != nil {
+		r.logger.Error("database error", "error", err.Error(), "user_id", userId)
+		return err
+	}
+	return r.db.Delete(&session).Error
+}
+
+func (r *Repository) CountActiveSessions(userId uint) (int64, error) {
+	r.logger.Debug("get count active sessions", "user_id", userId)
+	var count int64
+	err := r.db.Model(&entity.Session{}).
+		Where("user_id = ? AND expires_at > ?", userId, time.Now()).
+		Count(&count).Error
+	if err != nil {
+		r.logger.Error("database error", "error", err.Error(), "user_id", userId)
+	}
+	return count, err
 }

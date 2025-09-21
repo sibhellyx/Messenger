@@ -67,7 +67,7 @@ func (m *Manager) Parse(accessToken string) (payload.JwtPayload, error) {
 }
 
 func (m *Manager) NewRefreshToken() (string, error) {
-	m.logger.Debug("creating refresh token")
+	m.logger.Debug("generate refresh token")
 	b := make([]byte, 32)
 
 	if _, err := rand.Read(b); err != nil {
