@@ -48,9 +48,17 @@ type AuthService struct {
 
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
+	activeSessions  int
 }
 
-func NewAuthService(repository RepositoryInterface, logger *slog.Logger, hasher HasherInterface, manager TokenManagerInterface, accessTokenTTL, refreshTokenTTL time.Duration) *AuthService {
+func NewAuthService(
+	repository RepositoryInterface,
+	logger *slog.Logger,
+	hasher HasherInterface,
+	manager TokenManagerInterface,
+	accessTokenTTL, refreshTokenTTL time.Duration,
+	activeSessions int,
+) *AuthService {
 	return &AuthService{
 		repository:      repository,
 		logger:          logger,
@@ -58,6 +66,7 @@ func NewAuthService(repository RepositoryInterface, logger *slog.Logger, hasher 
 		tokenManager:    manager,
 		accessTokenTTL:  accessTokenTTL,
 		refreshTokenTTL: refreshTokenTTL,
+		activeSessions:  activeSessions,
 	}
 }
 
@@ -143,7 +152,6 @@ func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginP
 func (s *AuthService) createSession(userId uint, params request.LoginParams) (response.Tokens, error) {
 	s.logger.Debug("creating session started")
 
-	// add cheecking old sessions end expired, clear for free limit session
 	if err := s.repository.DeleteExpiredSessions(userId); err != nil {
 		s.logger.Warn("failed to cleanup expired sessions", "error", err)
 	}
@@ -153,9 +161,7 @@ func (s *AuthService) createSession(userId uint, params request.LoginParams) (re
 		return response.Tokens{}, fmt.Errorf("failed to count active sessions: %w", err)
 	}
 
-	const maxActiveSessions = 5 // add geting from config
-
-	if activeCount >= maxActiveSessions {
+	if activeCount >= int64(s.activeSessions) {
 		if err := s.repository.DeleteOldestSession(userId); err != nil {
 			s.logger.Warn("failed to delete oldest session", "error", err)
 		}

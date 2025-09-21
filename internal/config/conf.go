@@ -20,6 +20,8 @@ type Config struct {
 	//for tokens
 	AccessTTL  int `mapstructure:"ACCESS_TTL"`
 	RefreshTTL int `mapstructure:"REFRESH_TTL"`
+	//for sessions
+	ActiveSessions int `mapstructure:"ACTIVE_SESSIONS"`
 }
 
 func LoadConfig() Config {
@@ -41,6 +43,7 @@ func LoadConfig() Config {
 	v.SetDefault("DB_PASS", "password")
 	v.SetDefault("ACCESS_TTL", 15)
 	v.SetDefault("REFRESH_TTL", 10)
+	v.SetDefault("ACTIVE_SESSIONS", 5)
 
 	var cfg Config
 

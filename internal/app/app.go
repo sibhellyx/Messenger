@@ -65,8 +65,18 @@ func (srv *Server) Serve() {
 
 	srv.logger.Debug("connecting to auth repository")
 	repository := db.NewRepository(srv.db, srv.logger)
+
 	srv.logger.Debug("connecting to auth service")
-	authService := authservice.NewAuthService(repository, srv.logger, hasher, manager, time.Duration(srv.cfg.AccessTTL*int(time.Minute)), time.Duration(srv.cfg.RefreshTTL*int(time.Hour*24)))
+	authService := authservice.NewAuthService(
+		repository,
+		srv.logger,
+		hasher,
+		manager,
+		time.Duration(srv.cfg.AccessTTL*int(time.Minute)),
+		time.Duration(srv.cfg.RefreshTTL*int(time.Hour*24)),
+		srv.cfg.ActiveSessions,
+	)
+
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 
