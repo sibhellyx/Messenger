@@ -112,15 +112,19 @@ func (r *Repository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken stri
 	return &session, nil
 }
 
-func (r *Repository) CheckSessionByUuid(uuid string) (bool, error) {
-	r.logger.Debug("check session", "uuid", uuid)
-	var count int64
-	err := r.db.Model(&entity.Session{}).Where("uuid = ?", uuid).Count(&count).Error
-	if err != nil {
-		r.logger.Error("database error find session by uuid", "error", err.Error())
-		return false, errors.New("failed check session")
+func (r *Repository) GetSessionByUuid(uuid string) (*entity.Session, error) {
+	r.logger.Debug("get session by uuid", "uuid", uuid)
+	var session entity.Session
+	result := r.db.Where("uuid = ?", uuid).First(&session)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			r.logger.Warn("session for this uuid not found", "uuid", uuid)
+			return nil, errors.New("session not found")
+		}
+		r.logger.Error("database error", "error", result.Error, "uuid", uuid)
+		return nil, errors.New("database error")
 	}
-	return count > 0, nil
+	return &session, nil
 }
 
 func (r *Repository) DeleteExpiredSessions(userId uint) error {

@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/payload"
 )
 
@@ -10,32 +14,37 @@ type JwtManagerInterface interface {
 }
 
 type SessionRepositoryInterface interface {
-	CheckSessionByUuid(uuid string) (bool, error)
+	GetSessionByUuid(uuid string) (*entity.Session, error)
+	DeleteSessionByUuid(uuid string) error
 }
 
 func AuthMiddleware(m JwtManagerInterface, s SessionRepositoryInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.GetHeader("Auth")
-		if token == "" {
-			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		token := c.GetHeader("Authorization")
+		if !strings.HasPrefix(token, "Bearer ") {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Invalid authorization header"})
 			return
 		}
 
+		token = strings.TrimPrefix(token, "Bearer ")
 		payload, err := m.Parse(token)
 		if err != nil {
 			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		exists, err := s.CheckSessionByUuid(payload.Uuid)
-		if err != nil {
-			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		session, err := s.GetSessionByUuid(payload.Uuid)
+		if err != nil || session == nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Session not found"})
 			return
 		}
-		if !exists {
-			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+
+		if time.Now().After(session.ExpiresAt) {
+			s.DeleteSessionByUuid(payload.Uuid)
+			c.AbortWithStatusJSON(401, gin.H{"error": "Session expired"})
 			return
 		}
+
 		c.Set("uuid", payload.Uuid)
 		c.Set("user_id", payload.UserId)
 

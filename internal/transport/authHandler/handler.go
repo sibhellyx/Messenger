@@ -3,6 +3,7 @@ package authhandler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
@@ -73,7 +74,12 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	access := c.GetHeader("Auth")
+	access := c.GetHeader("Authorization")
+	if !strings.HasPrefix(access, "Bearer ") {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Invalid authorization header"})
+		return
+	}
+	access = strings.TrimPrefix(access, "Bearer ")
 
 	var req request.RefreshTokenRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&req)
