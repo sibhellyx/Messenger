@@ -30,6 +30,7 @@ type RepositoryInterface interface {
 type HasherInterface interface {
 	Hash(password string) (string, error)
 	HashRefreshToken(refreshToken string) string
+	ComparePassword(hashedPassword, password string) bool
 }
 
 type TokenManagerInterface interface {
@@ -99,16 +100,13 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 		s.logger.Error("error validating user input", "error", err.Error())
 		return response.Tokens{}, err
 	}
-	passwordHash, err := s.hasher.Hash(user.Password) //hash password
-	if err != nil {
-		s.logger.Error("failed hash password", "error", err.Error())
-		return response.Tokens{}, errors.New("failed hashed password")
-	}
-	u, err := s.repository.GetUserByCredentails(user.Tgname, passwordHash)
-	if err != nil {
+
+	u, err := s.repository.GetUserByTgname(user.Tgname)
+	if err != nil && !s.hasher.ComparePassword(u.Password, user.Password) {
 		s.logger.Error("failed get user", "error", err.Error())
-		return response.Tokens{}, errors.New("incorrect name or password")
+		return response.Tokens{}, errors.New("invalid credentials")
 	}
+
 	return s.createSession(u.ID, params)
 }
 

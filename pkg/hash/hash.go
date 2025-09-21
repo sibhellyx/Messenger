@@ -1,9 +1,10 @@
 package hash
 
 import (
-	"crypto/sha512"
-	"encoding/base64"
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Hasher struct {
@@ -15,15 +16,16 @@ func NewHasher(salt string) *Hasher {
 }
 
 func (h *Hasher) Hash(password string) (string, error) {
-	hash := sha512.New()
-
-	if _, err := hash.Write([]byte(password)); err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%x", hash.Sum([]byte(h.salt))), nil
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(hash), err
 }
 
 func (h *Hasher) HashRefreshToken(refreshToken string) string {
-	return base64.StdEncoding.EncodeToString([]byte(refreshToken))
+	hash := sha256.New()
+	hash.Write([]byte(refreshToken + h.salt))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func (h *Hasher) ComparePassword(hashedPassword, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)) == nil
 }
