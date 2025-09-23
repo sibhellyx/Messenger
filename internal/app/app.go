@@ -47,6 +47,11 @@ func NewServer(ctx context.Context, cfg config.Config) *Server {
 func (srv *Server) Serve() {
 	srv.logger.Info("starting server", "port", srv.cfg.Port)
 
+	// load config for web sockets
+	srv.logger.Debug("loading configs for websockets")
+	wsConfs := config.LoadWsConfig()
+
+	// start database
 	srv.logger.Debug("connecting to database")
 	database, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  srv.cfg.GetDbString(),
@@ -58,21 +63,26 @@ func (srv *Server) Serve() {
 	}
 	srv.db = database
 
+	// migration database
 	err = db.Migrate(srv.db, srv.logger)
 	if err != nil {
 		srv.logger.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
 
-	hub := ws.NewHub(srv.logger)
+	// start hub for chat
+	hub := ws.NewHub(srv.logger, wsConfs)
 	go hub.Run()
 
+	//init hasher and manager
 	hasher := hash.NewHasher("salt")
 	manager := auth.NewManager("some-auth-manager", srv.logger)
 
+	// init repos for auth
 	srv.logger.Debug("connecting to auth repository")
 	repository := authrepo.NewRepository(srv.db, srv.logger)
 
+	// init service for auth
 	srv.logger.Debug("connecting to auth service")
 	authService := authservice.NewAuthService(
 		repository,
@@ -84,19 +94,26 @@ func (srv *Server) Serve() {
 		srv.cfg.ActiveSessions,
 	)
 
+	// init authHandler
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
+
+	// init ws handler
+	srv.logger.Debug("connecting to ws handler")
 	wsHandler := wshandler.NewWsHandler(hub, srv.logger)
 
+	//init routes for messanger
 	srv.logger.Debug("creating routes")
 	routes := api.CreateRoutes(authHandler, wsHandler, srv.logger, manager, repository)
 
+	// create http server
 	srv.logger.Debug("init server")
 	srv.srv = &http.Server{
 		Addr:    ":" + srv.cfg.Port,
 		Handler: routes,
 	}
 
+	// start server
 	srv.logger.Info("starting HTTP server", "port", srv.cfg.Port)
 	if err := srv.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		srv.logger.Error("HTTP server error - shutting down", "error", err)

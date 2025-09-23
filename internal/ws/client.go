@@ -35,22 +35,15 @@ func NewClient(
 	}
 }
 
-const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
-)
-
 func (c *Client) ReadPump() {
 	defer func() {
 		c.Conn.Close()
 	}()
 
-	c.Conn.SetReadLimit(maxMessageSize)
-	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.Conn.SetReadLimit(c.hub.config.MaxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(c.hub.config.PongWait))
 	c.Conn.SetPongHandler(func(string) error {
-		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		c.Conn.SetReadDeadline(time.Now().Add(c.hub.config.PongWait))
 		return nil
 	})
 
@@ -65,7 +58,7 @@ func (c *Client) ReadPump() {
 }
 
 func (c *Client) WritePump() {
-	ticker := time.NewTicker(pingPeriod)
+	ticker := time.NewTicker(c.hub.config.PingPeriod)
 	defer func() {
 		ticker.Stop()
 		c.Conn.Close()
@@ -74,7 +67,7 @@ func (c *Client) WritePump() {
 	for {
 		select {
 		case message, ok := <-c.Send:
-			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if !ok {
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -90,7 +83,7 @@ func (c *Client) WritePump() {
 				return
 			}
 		case <-ticker.C:
-			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

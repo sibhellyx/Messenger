@@ -2,6 +2,8 @@ package ws
 
 import (
 	"log/slog"
+
+	"github.com/sibhellyx/Messenger/internal/config"
 )
 
 type Hub struct {
@@ -11,15 +13,17 @@ type Hub struct {
 	Unregister chan *Client
 
 	logger *slog.Logger
+	config config.WsConfig
 }
 
-func NewHub(logger *slog.Logger) *Hub {
+func NewHub(logger *slog.Logger, conf config.WsConfig) *Hub {
 	return &Hub{
 		Broadcast:  make(chan []byte),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		Clients:    make(map[*Client]bool),
 		logger:     logger,
+		config:     conf,
 	}
 }
 

@@ -9,20 +9,20 @@ import (
 )
 
 type WsHandler struct {
-	hub    *ws.Hub
-	logger *slog.Logger
+	hub      *ws.Hub
+	upgrader websocket.Upgrader
+	logger   *slog.Logger
 }
 
 func NewWsHandler(hub *ws.Hub, logger *slog.Logger) *WsHandler {
 	return &WsHandler{
-		hub:    hub,
+		hub: hub,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
 		logger: logger,
 	}
-}
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
 }
 
 func (h *WsHandler) Connect(c *gin.Context) {
@@ -37,7 +37,7 @@ func (h *WsHandler) Connect(c *gin.Context) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to upgrade connection"})
 		return
