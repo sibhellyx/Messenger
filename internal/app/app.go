@@ -13,6 +13,8 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
+	wshandler "github.com/sibhellyx/Messenger/internal/transport/wsHandler"
+	"github.com/sibhellyx/Messenger/internal/ws"
 	"github.com/sibhellyx/Messenger/pkg/auth"
 	"github.com/sibhellyx/Messenger/pkg/hash"
 	"gorm.io/driver/postgres"
@@ -61,6 +63,10 @@ func (srv *Server) Serve() {
 		srv.logger.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
+
+	hub := ws.NewHub(srv.logger)
+	go hub.Run()
+
 	hasher := hash.NewHasher("salt")
 	manager := auth.NewManager("some-auth-manager", srv.logger)
 
@@ -80,9 +86,10 @@ func (srv *Server) Serve() {
 
 	srv.logger.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
+	wsHandler := wshandler.NewWsHandler(hub, srv.logger)
 
 	srv.logger.Debug("creating routes")
-	routes := api.CreateRoutes(authHandler, srv.logger, manager, repository)
+	routes := api.CreateRoutes(authHandler, wsHandler, srv.logger, manager, repository)
 
 	srv.logger.Debug("init server")
 	srv.srv = &http.Server{

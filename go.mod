@@ -9,6 +9,8 @@ require (
 	gorm.io/gorm v1.31.0
 )
 
+require github.com/gorilla/websocket v1.5.3 // direct
+
 require github.com/dgrijalva/jwt-go v3.2.0+incompatible // direct
 
 require (
