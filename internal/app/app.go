@@ -10,6 +10,7 @@ import (
 	"github.com/sibhellyx/Messenger/api"
 	"github.com/sibhellyx/Messenger/internal/config"
 	"github.com/sibhellyx/Messenger/internal/db"
+	"github.com/sibhellyx/Messenger/internal/db/authrepo"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
 	"github.com/sibhellyx/Messenger/pkg/auth"
@@ -64,7 +65,7 @@ func (srv *Server) Serve() {
 	manager := auth.NewManager("some-auth-manager", srv.logger)
 
 	srv.logger.Debug("connecting to auth repository")
-	repository := db.NewRepository(srv.db, srv.logger)
+	repository := authrepo.NewRepository(srv.db, srv.logger)
 
 	srv.logger.Debug("connecting to auth service")
 	authService := authservice.NewAuthService(
