@@ -28,11 +28,14 @@ func NewHub(logger *slog.Logger, conf config.WsConfig) *Hub {
 }
 
 func (h *Hub) Run() {
+	h.logger.Debug("hub run")
 	for {
 		select {
 		case client := <-h.Register:
+			h.logger.Info("register", "user_id", client.ID)
 			h.Clients[client] = true
 		case client := <-h.Unregister:
+			h.logger.Info("unregister", "user_id", client.ID)
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				close(client.Send)

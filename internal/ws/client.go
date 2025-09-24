@@ -37,8 +37,17 @@ func NewClient(
 
 func (c *Client) ReadPump() {
 	defer func() {
+		c.hub.logger.Info("ReadPump stopped",
+			"client_id", c.ID,
+			"client_uuid", c.UUID)
 		c.Conn.Close()
 	}()
+
+	c.hub.logger.Debug("ReadPump started",
+		"client_id", c.ID,
+		"client_uuid", c.UUID,
+		"user_agent", c.UserAgent,
+		"remote_addr", c.LastIP)
 
 	c.Conn.SetReadLimit(c.hub.config.MaxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(c.hub.config.PongWait))
@@ -47,14 +56,43 @@ func (c *Client) ReadPump() {
 		return nil
 	})
 
+	var messageCount int
 	for {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
+			// ✅ Логируем причину разрыва соединения
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				c.hub.logger.Warn("Unexpected WebSocket close",
+					"client_id", c.ID,
+					"error", err,
+					"total_messages", messageCount)
+			} else {
+				c.hub.logger.Debug("WebSocket connection closed",
+					"client_id", c.ID,
+					"error", err,
+					"total_messages", messageCount)
+			}
 			break
 		}
 
+		messageCount++
+
+		c.hub.logger.Debug("Message received",
+			"client_id", c.ID,
+			"message_size", len(message),
+			"message_preview", string(c.truncateMessage(message)),
+			"message_number", messageCount)
+
 		c.hub.Broadcast <- message
 	}
+}
+
+// func for truncate message for shortly preview
+func (c *Client) truncateMessage(msg []byte) []byte {
+	if len(msg) > 100 {
+		return append(msg[:100], '.', '.', '.')
+	}
+	return msg
 }
 
 func (c *Client) WritePump() {
@@ -62,31 +100,65 @@ func (c *Client) WritePump() {
 	defer func() {
 		ticker.Stop()
 		c.Conn.Close()
+		c.hub.logger.Info("WritePump stopped",
+			"client_id", c.ID,
+			"client_uuid", c.UUID)
 	}()
 
+	c.hub.logger.Debug("WritePump started",
+		"client_id", c.ID,
+		"ping_interval", c.hub.config.PingPeriod)
+
+	var sentMessages int
 	for {
 		select {
 		case message, ok := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if !ok {
+				c.hub.logger.Debug("Send channel closed, sending close message",
+					"client_id", c.ID)
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
+				c.hub.logger.Warn("Failed to create WebSocket writer",
+					"client_id", c.ID,
+					"error", err)
 				return
 			}
-			w.Write(message)
+
+			if _, err := w.Write(message); err != nil {
+				c.hub.logger.Warn("Failed to write message",
+					"client_id", c.ID,
+					"error", err)
+				return
+			}
 
 			if err := w.Close(); err != nil {
+				c.hub.logger.Warn("Failed to close WebSocket writer",
+					"client_id", c.ID,
+					"error", err)
 				return
 			}
+
+			sentMessages++
+			c.hub.logger.Debug("Message sent to client",
+				"client_id", c.ID,
+				"message_size", len(message),
+				"total_sent", sentMessages)
+
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.hub.logger.Debug("Failed to send ping",
+					"client_id", c.ID,
+					"error", err)
 				return
 			}
+			c.hub.logger.Debug("Ping sent",
+				"client_id", c.ID)
 		}
 	}
 }

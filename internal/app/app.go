@@ -64,18 +64,22 @@ func (srv *Server) Serve() {
 	srv.db = database
 
 	// migration database
+	srv.logger.Debug("do migration to database")
 	err = db.Migrate(srv.db, srv.logger)
 	if err != nil {
 		srv.logger.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
 
-	// start hub for chat
+	// init and start hub for chat
+	srv.logger.Debug("connect and start hub")
 	hub := ws.NewHub(srv.logger, wsConfs)
 	go hub.Run()
 
 	//init hasher and manager
+	srv.logger.Debug("init hasher for passwords")
 	hasher := hash.NewHasher("salt")
+	srv.logger.Debug("init manager for auth")
 	manager := auth.NewManager("some-auth-manager", srv.logger)
 
 	// init repos for auth
