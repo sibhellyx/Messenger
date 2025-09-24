@@ -98,8 +98,13 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 	}
 
 	u, err := s.repository.GetUserByTgname(user.Tgname)
-	if err != nil && !s.hasher.ComparePassword(u.Password, user.Password) {
-		slog.Error("failed get user", "error", err.Error())
+	if err != nil {
+		slog.Error("failed to get user", "error", err.Error())
+		return response.Tokens{}, errors.New("invalid credentials")
+	}
+
+	if !s.hasher.ComparePassword(u.Password, user.Password) {
+		slog.Error("invalid password", "tgname", user.Tgname)
 		return response.Tokens{}, errors.New("invalid credentials")
 	}
 
