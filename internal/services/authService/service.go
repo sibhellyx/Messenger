@@ -42,8 +42,6 @@ type TokenManagerInterface interface {
 type AuthService struct {
 	repository RepositoryInterface
 
-	logger *slog.Logger
-
 	hasher       HasherInterface
 	tokenManager TokenManagerInterface
 
@@ -54,7 +52,6 @@ type AuthService struct {
 
 func NewAuthService(
 	repository RepositoryInterface,
-	logger *slog.Logger,
 	hasher HasherInterface,
 	manager TokenManagerInterface,
 	accessTokenTTL, refreshTokenTTL time.Duration,
@@ -62,7 +59,6 @@ func NewAuthService(
 ) *AuthService {
 	return &AuthService{
 		repository:      repository,
-		logger:          logger,
 		hasher:          hasher,
 		tokenManager:    manager,
 		accessTokenTTL:  accessTokenTTL,
@@ -73,37 +69,37 @@ func NewAuthService(
 
 // register user service layer
 func (s *AuthService) RegisterUser(user entity.User) error {
-	s.logger.Debug("service register started")
+	slog.Debug("service register started")
 	err := user.Validate() //function return error if user not isValid
 	if err != nil {
-		s.logger.Error("error validating user input", "error", err.Error())
+		slog.Error("error validating user input", "error", err.Error())
 		return err
 	}
 	user.Password, err = s.hasher.Hash(user.Password) //hash password
 	if err != nil {
-		s.logger.Error("failed hash password", "error", err.Error())
+		slog.Error("failed hash password", "error", err.Error())
 		return err
 	}
 	err = s.repository.CreateUser(user) //write to repo
 	if err != nil {
-		s.logger.Error("failed create user in repo", "error", err.Error())
+		slog.Error("failed create user in repo", "error", err.Error())
 		return err
 	}
-	s.logger.Debug("service register completed")
+	slog.Debug("service register completed")
 	return nil
 }
 
 func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error) {
-	s.logger.Debug("service login started")
+	slog.Debug("service login started")
 	err := user.Validate()
 	if err != nil {
-		s.logger.Error("error validating user input", "error", err.Error())
+		slog.Error("error validating user input", "error", err.Error())
 		return response.Tokens{}, err
 	}
 
 	u, err := s.repository.GetUserByTgname(user.Tgname)
 	if err != nil && !s.hasher.ComparePassword(u.Password, user.Password) {
-		s.logger.Error("failed get user", "error", err.Error())
+		slog.Error("failed get user", "error", err.Error())
 		return response.Tokens{}, errors.New("invalid credentials")
 	}
 
@@ -111,47 +107,47 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 }
 
 func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginParams) (response.Tokens, error) {
-	s.logger.Debug("service refresh token started")
+	slog.Debug("service refresh token started")
 	err := tokens.Validate()
 	if err != nil {
-		s.logger.Error("error validating tokens", "error", err.Error())
+		slog.Error("error validating tokens", "error", err.Error())
 		return response.Tokens{}, err
 	}
 	refreshTokenHash := s.hasher.HashRefreshToken(tokens.RefreshToken)
 
 	payload, err := s.tokenManager.Parse(tokens.AccessToken)
 	if err != nil {
-		s.logger.Error("failed parse access token", "error", err.Error())
+		slog.Error("failed parse access token", "error", err.Error())
 		return response.Tokens{}, errors.New("failed parse access token")
 	}
 
 	session, err := s.repository.FindJwtSessionByUuidAndRefreshToken(payload.Uuid, refreshTokenHash)
 	if err != nil {
-		s.logger.Error("failed founding session with this token token", "error", err.Error())
+		slog.Error("failed founding session with this token token", "error", err.Error())
 		return response.Tokens{}, errors.New("failed found session")
 	}
 	if session == nil {
-		s.logger.Debug("session with this uuid and refresh token not found", "user_id", payload.UserId, "uuid", payload.Uuid, "refresh_token", tokens.RefreshToken)
+		slog.Debug("session with this uuid and refresh token not found", "user_id", payload.UserId, "uuid", payload.Uuid, "refresh_token", tokens.RefreshToken)
 		return response.Tokens{}, errors.New("this session not found or this refresh token was issued separately")
 	}
 	if session.UserAgent != params.UserAgent {
 		err := s.repository.DeleteSessionByUuid(payload.Uuid)
 		if err != nil {
-			s.logger.Error("failed deleted session, different user agents", "error", err.Error())
+			slog.Error("failed deleted session, different user agents", "error", err.Error())
 			return response.Tokens{}, errors.New("failed delete session, different user agents")
 		}
 		errMsg := "error refresh token from another user agent"
-		s.logger.Error("different user agents", "error", errMsg)
+		slog.Error("different user agents", "error", errMsg)
 		return response.Tokens{}, errors.New(errMsg)
 	}
 	return s.generateSessionAndSave(*session, false)
 }
 
 func (s *AuthService) createSession(userId uint, params request.LoginParams) (response.Tokens, error) {
-	s.logger.Debug("creating session started")
+	slog.Debug("creating session started")
 
 	if err := s.repository.DeleteExpiredSessions(userId); err != nil {
-		s.logger.Warn("failed to cleanup expired sessions", "error", err)
+		slog.Warn("failed to cleanup expired sessions", "error", err)
 	}
 
 	activeCount, err := s.repository.CountActiveSessions(userId)
@@ -161,7 +157,7 @@ func (s *AuthService) createSession(userId uint, params request.LoginParams) (re
 
 	if activeCount >= int64(s.activeSessions) {
 		if err := s.repository.DeleteOldestSession(userId); err != nil {
-			s.logger.Warn("failed to delete oldest session", "error", err)
+			slog.Warn("failed to delete oldest session", "error", err)
 		}
 	}
 
@@ -175,7 +171,7 @@ func (s *AuthService) createSession(userId uint, params request.LoginParams) (re
 }
 
 func (s *AuthService) generateSessionAndSave(session entity.Session, isNewSession bool) (response.Tokens, error) {
-	s.logger.Debug("generation session", "usesr_id", session.UserID)
+	slog.Debug("generation session", "usesr_id", session.UserID)
 
 	var (
 		res response.Tokens
@@ -189,17 +185,17 @@ func (s *AuthService) generateSessionAndSave(session entity.Session, isNewSessio
 		Uuid:   uid.String(),
 	}
 
-	s.logger.Debug("creating access token")
+	slog.Debug("creating access token")
 	res.AccessToken, err = s.tokenManager.NewJWT(payload, s.accessTokenTTL)
 	if err != nil {
-		s.logger.Error("failed create access token", "error", err)
+		slog.Error("failed create access token", "error", err)
 		return response.Tokens{}, errors.New("failed create access token")
 	}
 
-	s.logger.Debug("creating refresh token")
+	slog.Debug("creating refresh token")
 	res.RefreshToken, err = s.tokenManager.NewRefreshToken()
 	if err != nil {
-		s.logger.Error("failed create refresh token", "error", err)
+		slog.Error("failed create refresh token", "error", err)
 		return response.Tokens{}, errors.New("failed create refresh token")
 	}
 
@@ -210,29 +206,29 @@ func (s *AuthService) generateSessionAndSave(session entity.Session, isNewSessio
 	if isNewSession {
 		err = s.repository.CreateSession(session)
 		if err != nil {
-			s.logger.Error("failed create session for user", "error", err)
+			slog.Error("failed create session for user", "error", err)
 			return response.Tokens{}, errors.New("failed create and save session")
 		}
-		s.logger.Debug("session created successfully", "user_id", session.UserID, "uuid", uid)
+		slog.Debug("session created successfully", "user_id", session.UserID, "uuid", uid)
 	} else {
 		err = s.repository.UpdateSession(session)
 		if err != nil {
-			s.logger.Error("failed update session for user", "error", err)
+			slog.Error("failed update session for user", "error", err)
 			return response.Tokens{}, errors.New("failed update session")
 		}
 
-		s.logger.Debug("session updated successfully", "user_id", session.UserID, "uuid", uid)
+		slog.Debug("session updated successfully", "user_id", session.UserID, "uuid", uid)
 	}
 	return res, nil
 
 }
 
 func (s *AuthService) Logout(userId, uuid string) error {
-	s.logger.Debug("logout from session", "uuid", uuid, "user_id", userId)
+	slog.Debug("logout from session", "uuid", uuid, "user_id", userId)
 
 	err := s.repository.DeleteSessionByUuid(uuid)
 	if err != nil {
-		s.logger.Error("failed logout", "error", err.Error())
+		slog.Error("failed logout", "error", err.Error())
 		return errors.New("failed logout")
 	}
 	return nil

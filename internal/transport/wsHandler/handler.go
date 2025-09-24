@@ -11,17 +11,15 @@ import (
 type WsHandler struct {
 	hub      *ws.Hub
 	upgrader websocket.Upgrader
-	logger   *slog.Logger
 }
 
-func NewWsHandler(hub *ws.Hub, logger *slog.Logger) *WsHandler {
+func NewWsHandler(hub *ws.Hub) *WsHandler {
 	return &WsHandler{
 		hub: hub,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		logger: logger,
 	}
 }
 
@@ -57,7 +55,7 @@ func (h *WsHandler) Connect(c *gin.Context) {
 	go client.WritePump()
 	go client.ReadPump()
 
-	h.logger.Info("New client connected",
+	slog.Info("New client connected",
 		"user_id", client.ID,
 		"uuid", client.UUID,
 		"total_clients", len(h.hub.Clients))

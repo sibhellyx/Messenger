@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -37,13 +38,13 @@ func NewClient(
 
 func (c *Client) ReadPump() {
 	defer func() {
-		c.hub.logger.Info("ReadPump stopped",
+		slog.Info("ReadPump stopped",
 			"client_id", c.ID,
 			"client_uuid", c.UUID)
 		c.Conn.Close()
 	}()
 
-	c.hub.logger.Debug("ReadPump started",
+	slog.Debug("ReadPump started",
 		"client_id", c.ID,
 		"client_uuid", c.UUID,
 		"user_agent", c.UserAgent,
@@ -60,14 +61,13 @@ func (c *Client) ReadPump() {
 	for {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
-			// ✅ Логируем причину разрыва соединения
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.hub.logger.Warn("Unexpected WebSocket close",
+				slog.Warn("Unexpected WebSocket close",
 					"client_id", c.ID,
 					"error", err,
 					"total_messages", messageCount)
 			} else {
-				c.hub.logger.Debug("WebSocket connection closed",
+				slog.Debug("WebSocket connection closed",
 					"client_id", c.ID,
 					"error", err,
 					"total_messages", messageCount)
@@ -77,7 +77,7 @@ func (c *Client) ReadPump() {
 
 		messageCount++
 
-		c.hub.logger.Debug("Message received",
+		slog.Debug("Message received",
 			"client_id", c.ID,
 			"message_size", len(message),
 			"message_preview", string(c.truncateMessage(message)),
@@ -100,12 +100,12 @@ func (c *Client) WritePump() {
 	defer func() {
 		ticker.Stop()
 		c.Conn.Close()
-		c.hub.logger.Info("WritePump stopped",
+		slog.Info("WritePump stopped",
 			"client_id", c.ID,
 			"client_uuid", c.UUID)
 	}()
 
-	c.hub.logger.Debug("WritePump started",
+	slog.Debug("WritePump started",
 		"client_id", c.ID,
 		"ping_interval", c.hub.config.PingPeriod)
 
@@ -115,7 +115,7 @@ func (c *Client) WritePump() {
 		case message, ok := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if !ok {
-				c.hub.logger.Debug("Send channel closed, sending close message",
+				slog.Debug("Send channel closed, sending close message",
 					"client_id", c.ID)
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -123,28 +123,28 @@ func (c *Client) WritePump() {
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
-				c.hub.logger.Warn("Failed to create WebSocket writer",
+				slog.Warn("Failed to create WebSocket writer",
 					"client_id", c.ID,
 					"error", err)
 				return
 			}
 
 			if _, err := w.Write(message); err != nil {
-				c.hub.logger.Warn("Failed to write message",
+				slog.Warn("Failed to write message",
 					"client_id", c.ID,
 					"error", err)
 				return
 			}
 
 			if err := w.Close(); err != nil {
-				c.hub.logger.Warn("Failed to close WebSocket writer",
+				slog.Warn("Failed to close WebSocket writer",
 					"client_id", c.ID,
 					"error", err)
 				return
 			}
 
 			sentMessages++
-			c.hub.logger.Debug("Message sent to client",
+			slog.Debug("Message sent to client",
 				"client_id", c.ID,
 				"message_size", len(message),
 				"total_sent", sentMessages)
@@ -152,12 +152,12 @@ func (c *Client) WritePump() {
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				c.hub.logger.Debug("Failed to send ping",
+				slog.Debug("Failed to send ping",
 					"client_id", c.ID,
 					"error", err)
 				return
 			}
-			c.hub.logger.Debug("Ping sent",
+			slog.Debug("Ping sent",
 				"client_id", c.ID)
 		}
 	}

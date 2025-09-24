@@ -2,7 +2,6 @@ package config
 
 import (
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -16,9 +15,6 @@ type WsConfig struct {
 }
 
 func LoadWsConfig() WsConfig {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 
 	v := viper.New()
 	v.SetConfigName("wsconfig")
@@ -38,20 +34,20 @@ func LoadWsConfig() WsConfig {
 	err := v.ReadInConfig()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Info("config file not found, using defaults and environment variables")
+			slog.Info("config file not found, using defaults and environment variables")
 		} else {
-			logger.Warn("error reading config file, using defaults and environment variables",
+			slog.Warn("error reading config file, using defaults and environment variables",
 				slog.String("error", err.Error()))
 		}
 	} else {
-		logger.Info("using config file",
+		slog.Info("using config file",
 			slog.String("file", v.ConfigFileUsed()))
 	}
 
 	// unmarshal cfg
 	err = v.Unmarshal(&cfg)
 	if err != nil {
-		logger.Error("failed to unmarshal config",
+		slog.Error("failed to unmarshal config",
 			slog.String("error", err.Error()))
 		panic(err)
 	}

@@ -1,8 +1,6 @@
 package api
 
 import (
-	"log/slog"
-
 	"github.com/gin-gonic/gin"
 	"github.com/sibhellyx/Messenger/internal/middleware"
 )
@@ -21,12 +19,11 @@ type WsHandlerInterface interface {
 func CreateRoutes(
 	authHandler AuthHandlerInterface,
 	wsHandler WsHandlerInterface,
-	logger *slog.Logger,
 	m middleware.JwtManagerInterface,
 	repo middleware.SessionRepositoryInterface,
 ) *gin.Engine {
 	r := gin.Default()
-	r.Use(middleware.LoggingMiddleware(logger))
+	r.Use(middleware.LoggingMiddleware())
 
 	// auth endpoints
 	r.POST("/register", authHandler.Register)

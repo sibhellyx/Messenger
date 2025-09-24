@@ -3,10 +3,31 @@ package config
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/spf13/viper"
 )
+
+type EnvConfig struct {
+	// type app
+	Environment string `mapstructure:"ENVIRONMENT"`
+}
+
+func LoadEnvConfig() (*EnvConfig, error) {
+
+	viper.SetConfigFile("configs/.env")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, err
+	}
+
+	var config EnvConfig
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
 
 type Config struct {
 	// serv cfg
@@ -25,9 +46,6 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 
 	v := viper.New()
 	v.SetConfigName("config")
@@ -53,25 +71,25 @@ func LoadConfig() Config {
 	err := v.ReadInConfig()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Info("config file not found, using defaults and environment variables")
+			slog.Info("config file not found, using defaults and environment variables")
 		} else {
-			logger.Warn("error reading config file, using defaults and environment variables",
+			slog.Warn("error reading config file, using defaults and environment variables",
 				slog.String("error", err.Error()))
 		}
 	} else {
-		logger.Info("using config file",
+		slog.Info("using config file",
 			slog.String("file", v.ConfigFileUsed()))
 	}
 
 	// unmarshal cfg
 	err = v.Unmarshal(&cfg)
 	if err != nil {
-		logger.Error("failed to unmarshal config",
+		slog.Error("failed to unmarshal config",
 			slog.String("error", err.Error()))
 		panic(err)
 	}
 
-	logger.Info("configuration loaded successfully",
+	slog.Info("configuration loaded successfully",
 		slog.String("port", cfg.Port),
 		slog.String("db_host", cfg.DBhost),
 		slog.String("db_name", cfg.DBname))

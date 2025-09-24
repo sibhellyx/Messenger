@@ -29,12 +29,7 @@ type Server struct {
 	logger *slog.Logger
 }
 
-func NewServer(ctx context.Context, cfg config.Config) *Server {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	slog.SetDefault(logger)
-
+func NewServer(ctx context.Context, cfg config.Config, logger *slog.Logger) *Server {
 	srv := &Server{
 		ctx:    ctx,
 		cfg:    cfg,
@@ -45,52 +40,51 @@ func NewServer(ctx context.Context, cfg config.Config) *Server {
 }
 
 func (srv *Server) Serve() {
-	srv.logger.Info("starting server", "port", srv.cfg.Port)
+	slog.Info("starting server", "port", srv.cfg.Port)
 
 	// load config for web sockets
-	srv.logger.Debug("loading configs for websockets")
+	slog.Debug("loading configs for websockets")
 	wsConfs := config.LoadWsConfig()
 
 	// start database
-	srv.logger.Debug("connecting to database")
+	slog.Debug("connecting to database")
 	database, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  srv.cfg.GetDbString(),
 		PreferSimpleProtocol: true,
 	}), &gorm.Config{})
 	if err != nil {
-		srv.logger.Error("failed to connect to database", "error", err)
+		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
 	srv.db = database
 
 	// migration database
-	srv.logger.Debug("do migration to database")
-	err = db.Migrate(srv.db, srv.logger)
+	slog.Debug("do migration to database")
+	err = db.Migrate(srv.db)
 	if err != nil {
-		srv.logger.Error("failed to migrate database", "error", err)
+		slog.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
 
 	// init and start hub for chat
-	srv.logger.Debug("connect and start hub")
-	hub := ws.NewHub(srv.logger, wsConfs)
+	slog.Debug("connect and start hub")
+	hub := ws.NewHub(wsConfs)
 	go hub.Run()
 
 	//init hasher and manager
-	srv.logger.Debug("init hasher for passwords")
+	slog.Debug("init hasher for passwords")
 	hasher := hash.NewHasher("salt")
-	srv.logger.Debug("init manager for auth")
-	manager := auth.NewManager("some-auth-manager", srv.logger)
+	slog.Debug("init manager for auth")
+	manager := auth.NewManager("some-auth-manager")
 
 	// init repos for auth
-	srv.logger.Debug("connecting to auth repository")
-	repository := authrepo.NewRepository(srv.db, srv.logger)
+	slog.Debug("connecting to auth repository")
+	repository := authrepo.NewRepository(srv.db)
 
 	// init service for auth
-	srv.logger.Debug("connecting to auth service")
+	slog.Debug("connecting to auth service")
 	authService := authservice.NewAuthService(
 		repository,
-		srv.logger,
 		hasher,
 		manager,
 		time.Duration(srv.cfg.AccessTTL*int(time.Minute)),
@@ -99,31 +93,31 @@ func (srv *Server) Serve() {
 	)
 
 	// init authHandler
-	srv.logger.Debug("connecting to auth handler")
+	slog.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 
 	// init ws handler
-	srv.logger.Debug("connecting to ws handler")
-	wsHandler := wshandler.NewWsHandler(hub, srv.logger)
+	slog.Debug("connecting to ws handler")
+	wsHandler := wshandler.NewWsHandler(hub)
 
 	//init routes for messanger
-	srv.logger.Debug("creating routes")
-	routes := api.CreateRoutes(authHandler, wsHandler, srv.logger, manager, repository)
+	slog.Debug("creating routes")
+	routes := api.CreateRoutes(authHandler, wsHandler, manager, repository)
 
 	// create http server
-	srv.logger.Debug("init server")
+	slog.Debug("init server")
 	srv.srv = &http.Server{
 		Addr:    ":" + srv.cfg.Port,
 		Handler: routes,
 	}
 
 	// start server
-	srv.logger.Info("starting HTTP server", "port", srv.cfg.Port)
+	slog.Info("starting HTTP server", "port", srv.cfg.Port)
 	if err := srv.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		srv.logger.Error("HTTP server error - shutting down", "error", err)
+		slog.Error("HTTP server error - shutting down", "error", err)
 		os.Exit(1)
 	}
-	srv.logger.Info("HTTP server stopped")
+	slog.Info("HTTP server stopped")
 }
 
 func (srv *Server) Shutdown() {
@@ -132,7 +126,7 @@ func (srv *Server) Shutdown() {
 	defer cancel()
 	err := srv.srv.Shutdown(ctxShutdown)
 	if err != nil {
-		srv.logger.Error("HTTP server shutdown error", "error", err)
+		slog.Error("HTTP server shutdown error", "error", err)
 		os.Exit(1)
 	}
 

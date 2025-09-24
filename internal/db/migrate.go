@@ -8,8 +8,8 @@ import (
 )
 
 // creating migration
-func Migrate(db *gorm.DB, logger *slog.Logger) error {
-	logger.Info("starting database migration")
+func Migrate(db *gorm.DB) error {
+	slog.Info("starting database migration")
 
 	// Создаем расширение для UUID (если используете PostgreSQL)
 	// if err := db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"").Error; err != nil {
@@ -23,10 +23,10 @@ func Migrate(db *gorm.DB, logger *slog.Logger) error {
 	)
 
 	if err != nil {
-		logger.Error("database migration failed", "error", err)
+		slog.Error("database migration failed", "error", err)
 		return err
 	}
 
-	logger.Info("database migration completed successfully")
+	slog.Info("database migration completed successfully")
 	return nil
 }

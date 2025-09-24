@@ -10,46 +10,44 @@ import (
 )
 
 type Repository struct {
-	db     *gorm.DB
-	logger *slog.Logger
+	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB, logger *slog.Logger) *Repository {
+func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{
-		db:     db,
-		logger: logger,
+		db: db,
 	}
 }
 
 func (r *Repository) CreateUser(user entity.User) error {
-	r.logger.Debug("creating user", "tgname", user.Tgname)
+	slog.Debug("creating user", "tgname", user.Tgname)
 
 	result := r.db.Create(&user)
 	if result.Error != nil {
-		r.logger.Error("failed to create user", "error", result.Error, "tgname", user.Tgname)
+		slog.Error("failed to create user", "error", result.Error, "tgname", user.Tgname)
 		return result.Error
 	}
 
-	r.logger.Info("user created successfully", "user_id", user.ID, "email", user.Tgname)
+	slog.Info("user created successfully", "user_id", user.ID, "email", user.Tgname)
 	return nil
 }
 
 func (r *Repository) GetUserByCredentails(tgname, password string) (*entity.User, error) {
-	r.logger.Debug("get user by credentails", "tgname", tgname)
+	slog.Debug("get user by credentails", "tgname", tgname)
 
 	var user entity.User
 	result := r.db.Where("tgname = ? AND password = ?", tgname, password).First(&user) //find user
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			r.logger.Warn("user not found or invalid credentials", "tgname", tgname)
+			slog.Warn("user not found or invalid credentials", "tgname", tgname)
 			return nil, errors.New("invalid credentials")
 		}
-		r.logger.Error("database error", "error", result.Error, "tgname", tgname)
+		slog.Error("database error", "error", result.Error, "tgname", tgname)
 		return nil, result.Error
 	}
 
-	r.logger.Info("user authenticated successfully", "user_id", user.ID, "tgname", tgname)
+	slog.Info("user authenticated successfully", "user_id", user.ID, "tgname", tgname)
 	return &user, nil
 }
 
@@ -58,24 +56,24 @@ func (r *Repository) GetUserByTgname(tgname string) (*entity.User, error) {
 	result := r.db.Where("tgname = ?", tgname).First(&user)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			r.logger.Warn("user not found or invalid credentials", "tgname", tgname)
+			slog.Warn("user not found or invalid credentials", "tgname", tgname)
 			return nil, errors.New("invalid credentials")
 		}
-		r.logger.Error("database error", "error", result.Error, "tgname", tgname)
+		slog.Error("database error", "error", result.Error, "tgname", tgname)
 		return nil, result.Error
 	}
 	return &user, nil
 }
 
 func (r *Repository) CreateSession(session entity.Session) error {
-	r.logger.Debug("create session user", "user_id", session.UserID)
+	slog.Debug("create session user", "user_id", session.UserID)
 
 	result := r.db.Create(&session)
 	if result.Error != nil {
-		r.logger.Error("failed to create user session", "error", result.Error, "user_id", session.UserID)
+		slog.Error("failed to create user session", "error", result.Error, "user_id", session.UserID)
 		return result.Error
 	}
-	r.logger.Info("session created successfully", "uuid", session.UUID, "refreshToken", session.RefreshToken, "user_id", session.UserID)
+	slog.Info("session created successfully", "uuid", session.UUID, "refreshToken", session.RefreshToken, "user_id", session.UserID)
 	return nil
 }
 
@@ -86,74 +84,74 @@ func (r *Repository) DeleteSessionByUuid(uuid string) error {
 func (r *Repository) UpdateSession(session entity.Session) error {
 	result := r.db.Save(&session)
 	if result.Error != nil {
-		r.logger.Error("failed to update session", "error", result.Error, "uuid", session.UUID, "user_id", session.UserID)
+		slog.Error("failed to update session", "error", result.Error, "uuid", session.UUID, "user_id", session.UserID)
 		return result.Error
 	}
-	r.logger.Info("session updated successfully", "uuid", session.UUID, "refreshToken", session.RefreshToken, "user_id", session.UserID)
+	slog.Info("session updated successfully", "uuid", session.UUID, "refreshToken", session.RefreshToken, "user_id", session.UserID)
 	return nil
 }
 
 func (r *Repository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken string) (*entity.Session, error) {
-	r.logger.Debug("get session", "uuid", uuid, "refreshToken", refreshToken)
+	slog.Debug("get session", "uuid", uuid, "refreshToken", refreshToken)
 
 	var session entity.Session
 	result := r.db.Where("uuid = ? AND refresh_token = ?", uuid, refreshToken).First(&session) //find session
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			r.logger.Warn("session with this token not found", "uuid", uuid, "refreshToken", refreshToken)
+			slog.Warn("session with this token not found", "uuid", uuid, "refreshToken", refreshToken)
 			return nil, errors.New("invalid credentials")
 		}
-		r.logger.Error("database error", "error", result.Error, "uuid", uuid, "refreshToken", refreshToken)
+		slog.Error("database error", "error", result.Error, "uuid", uuid, "refreshToken", refreshToken)
 		return nil, errors.New("database error")
 	}
 
-	r.logger.Info("session founded successfully", "uuid", uuid, "refreshToken", refreshToken, "user_id", session.UserID)
+	slog.Info("session founded successfully", "uuid", uuid, "refreshToken", refreshToken, "user_id", session.UserID)
 	return &session, nil
 }
 
 func (r *Repository) GetSessionByUuid(uuid string) (*entity.Session, error) {
-	r.logger.Debug("get session by uuid", "uuid", uuid)
+	slog.Debug("get session by uuid", "uuid", uuid)
 	var session entity.Session
 	result := r.db.Where("uuid = ?", uuid).First(&session)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			r.logger.Warn("session for this uuid not found", "uuid", uuid)
+			slog.Warn("session for this uuid not found", "uuid", uuid)
 			return nil, errors.New("session not found")
 		}
-		r.logger.Error("database error", "error", result.Error, "uuid", uuid)
+		slog.Error("database error", "error", result.Error, "uuid", uuid)
 		return nil, errors.New("database error")
 	}
 	return &session, nil
 }
 
 func (r *Repository) DeleteExpiredSessions(userId uint) error {
-	r.logger.Debug("deleting expired sessions", "user_id", userId)
+	slog.Debug("deleting expired sessions", "user_id", userId)
 	return r.db.Where("user_id = ? AND expires_at < ?", userId, time.Now()).
 		Delete(&entity.Session{}).Error
 }
 
 func (r *Repository) DeleteOldestSession(userId uint) error {
-	r.logger.Debug("deleted oldest session", "user_id", userId)
+	slog.Debug("deleted oldest session", "user_id", userId)
 	var session entity.Session
 	err := r.db.Where("user_id = ?", userId).
 		Order("created_at ASC").
 		First(&session).Error
 	if err != nil {
-		r.logger.Error("database error", "error", err.Error(), "user_id", userId)
+		slog.Error("database error", "error", err.Error(), "user_id", userId)
 		return err
 	}
 	return r.db.Delete(&session).Error
 }
 
 func (r *Repository) CountActiveSessions(userId uint) (int64, error) {
-	r.logger.Debug("get count active sessions", "user_id", userId)
+	slog.Debug("get count active sessions", "user_id", userId)
 	var count int64
 	err := r.db.Model(&entity.Session{}).
 		Where("user_id = ? AND expires_at > ?", userId, time.Now()).
 		Count(&count).Error
 	if err != nil {
-		r.logger.Error("database error", "error", err.Error(), "user_id", userId)
+		slog.Error("database error", "error", err.Error(), "user_id", userId)
 	}
 	return count, err
 }
