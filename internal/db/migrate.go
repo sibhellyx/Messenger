@@ -21,7 +21,6 @@ func Migrate(db *gorm.DB) error {
 		&entity.User{},
 		&entity.Session{},
 		&entity.Chat{},
-		&entity.ChatInvitation{},
 		&entity.ChatParticipant{},
 		&entity.Message{},
 	)

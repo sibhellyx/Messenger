@@ -32,7 +32,6 @@ type Chat struct {
 	Participants []ChatParticipant `gorm:"foreignKey:ChatID" json:"participants,omitempty"`
 	LastMessage  *Message          `gorm:"foreignKey:LastMessageID" json:"lastMessage,omitempty"`
 	Messages     []Message         `gorm:"foreignKey:ChatID" json:"messages,omitempty"`
-	Invitations  []ChatInvitation  `gorm:"foreignKey:ChatID" json:"invitations,omitempty"`
 }
 
 func (Chat) TableName() string {
