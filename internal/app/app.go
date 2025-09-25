@@ -79,7 +79,7 @@ func (srv *Server) Serve() {
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")
-	repository := authrepo.NewRepository(srv.db)
+	repository := authrepo.NewAuthRepository(srv.db)
 
 	// init service for auth
 	slog.Debug("connecting to auth service")

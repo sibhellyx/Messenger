@@ -9,17 +9,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository struct {
+type AuthRepository struct {
 	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{
+func NewAuthRepository(db *gorm.DB) *AuthRepository {
+	return &AuthRepository{
 		db: db,
 	}
 }
 
-func (r *Repository) CreateUser(user entity.User) error {
+func (r *AuthRepository) CreateUser(user entity.User) error {
 	slog.Debug("creating user", "tgname", user.Tgname)
 
 	result := r.db.Create(&user)
@@ -32,7 +32,7 @@ func (r *Repository) CreateUser(user entity.User) error {
 	return nil
 }
 
-func (r *Repository) GetUserByCredentails(tgname, password string) (*entity.User, error) {
+func (r *AuthRepository) GetUserByCredentails(tgname, password string) (*entity.User, error) {
 	slog.Debug("get user by credentails", "tgname", tgname)
 
 	var user entity.User
@@ -51,7 +51,7 @@ func (r *Repository) GetUserByCredentails(tgname, password string) (*entity.User
 	return &user, nil
 }
 
-func (r *Repository) GetUserByTgname(tgname string) (*entity.User, error) {
+func (r *AuthRepository) GetUserByTgname(tgname string) (*entity.User, error) {
 	var user entity.User
 	result := r.db.Where("tgname = ?", tgname).First(&user)
 	if result.Error != nil {
@@ -65,7 +65,7 @@ func (r *Repository) GetUserByTgname(tgname string) (*entity.User, error) {
 	return &user, nil
 }
 
-func (r *Repository) CreateSession(session entity.Session) error {
+func (r *AuthRepository) CreateSession(session entity.Session) error {
 	slog.Debug("create session user", "user_id", session.UserID)
 
 	result := r.db.Create(&session)
@@ -77,11 +77,11 @@ func (r *Repository) CreateSession(session entity.Session) error {
 	return nil
 }
 
-func (r *Repository) DeleteSessionByUuid(uuid string) error {
+func (r *AuthRepository) DeleteSessionByUuid(uuid string) error {
 	return r.db.Where("uuid = ?", uuid).Delete(&entity.Session{}).Error
 }
 
-func (r *Repository) UpdateSession(session entity.Session) error {
+func (r *AuthRepository) UpdateSession(session entity.Session) error {
 	result := r.db.Save(&session)
 	if result.Error != nil {
 		slog.Error("failed to update session", "error", result.Error, "uuid", session.UUID, "user_id", session.UserID)
@@ -91,7 +91,7 @@ func (r *Repository) UpdateSession(session entity.Session) error {
 	return nil
 }
 
-func (r *Repository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken string) (*entity.Session, error) {
+func (r *AuthRepository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken string) (*entity.Session, error) {
 	slog.Debug("get session", "uuid", uuid, "refreshToken", refreshToken)
 
 	var session entity.Session
@@ -110,7 +110,7 @@ func (r *Repository) FindJwtSessionByUuidAndRefreshToken(uuid, refreshToken stri
 	return &session, nil
 }
 
-func (r *Repository) GetSessionByUuid(uuid string) (*entity.Session, error) {
+func (r *AuthRepository) GetSessionByUuid(uuid string) (*entity.Session, error) {
 	slog.Debug("get session by uuid", "uuid", uuid)
 	var session entity.Session
 	result := r.db.Where("uuid = ?", uuid).First(&session)
@@ -125,13 +125,13 @@ func (r *Repository) GetSessionByUuid(uuid string) (*entity.Session, error) {
 	return &session, nil
 }
 
-func (r *Repository) DeleteExpiredSessions(userId uint) error {
+func (r *AuthRepository) DeleteExpiredSessions(userId uint) error {
 	slog.Debug("deleting expired sessions", "user_id", userId)
 	return r.db.Where("user_id = ? AND expires_at < ?", userId, time.Now()).
 		Delete(&entity.Session{}).Error
 }
 
-func (r *Repository) DeleteOldestSession(userId uint) error {
+func (r *AuthRepository) DeleteOldestSession(userId uint) error {
 	slog.Debug("deleted oldest session", "user_id", userId)
 	var session entity.Session
 	err := r.db.Where("user_id = ?", userId).
@@ -144,7 +144,7 @@ func (r *Repository) DeleteOldestSession(userId uint) error {
 	return r.db.Delete(&session).Error
 }
 
-func (r *Repository) CountActiveSessions(userId uint) (int64, error) {
+func (r *AuthRepository) CountActiveSessions(userId uint) (int64, error) {
 	slog.Debug("get count active sessions", "user_id", userId)
 	var count int64
 	err := r.db.Model(&entity.Session{}).
