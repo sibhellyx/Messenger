@@ -16,8 +16,13 @@ type WsHandlerInterface interface {
 	Connect(c *gin.Context)
 }
 
+type ChatHandlerInterface interface {
+	CreateChat(c *gin.Context)
+}
+
 func CreateRoutes(
 	authHandler AuthHandlerInterface,
+	chatHandler ChatHandlerInterface,
 	wsHandler WsHandlerInterface,
 	m middleware.JwtManagerInterface,
 	repo middleware.SessionRepositoryInterface,
@@ -30,6 +35,9 @@ func CreateRoutes(
 	r.POST("/login", authHandler.SignIn)
 	r.POST("/refresh", middleware.AuthMiddleware(m, repo), authHandler.RefreshToken)
 	r.POST("/logout", middleware.AuthMiddleware(m, repo), authHandler.LogoutUser)
+
+	// chat enpoints
+	r.POST("/chat/create", middleware.AuthMiddleware(m, repo), chatHandler.CreateChat)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)

@@ -10,9 +10,12 @@ import (
 	"github.com/sibhellyx/Messenger/api"
 	"github.com/sibhellyx/Messenger/internal/config"
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
+	"github.com/sibhellyx/Messenger/internal/db/chatrepo"
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
+	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
+	chathandler "github.com/sibhellyx/Messenger/internal/transport/chatHandler"
 	wshandler "github.com/sibhellyx/Messenger/internal/transport/wsHandler"
 	"github.com/sibhellyx/Messenger/internal/ws"
 	"github.com/sibhellyx/Messenger/pkg/auth"
@@ -79,30 +82,33 @@ func (srv *Server) Serve() {
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")
-	repository := authrepo.NewAuthRepository(srv.db)
+	authRepository := authrepo.NewAuthRepository(srv.db)
+	slog.Debug("connecting to chat repository")
+	chatRepository := chatrepo.NewChatRepository(srv.db)
 
 	// init service for auth
 	slog.Debug("connecting to auth service")
 	authService := authservice.NewAuthService(
-		repository,
+		authRepository,
 		hasher,
 		manager,
 		time.Duration(srv.cfg.AccessTTL*int(time.Minute)),
 		time.Duration(srv.cfg.RefreshTTL*int(time.Hour*24)),
 		srv.cfg.ActiveSessions,
 	)
-
-	// init authHandler
+	slog.Debug("connecting to chat service")
+	chatService := chatservice.NewChatService(chatRepository)
+	// init Handlers
 	slog.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
-
-	// init ws handler
+	slog.Debug("connecting to chat handler")
+	chatHandler := chathandler.NewChatHandler(chatService)
 	slog.Debug("connecting to ws handler")
 	wsHandler := wshandler.NewWsHandler(hub)
 
 	//init routes for messanger
 	slog.Debug("creating routes")
-	routes := api.CreateRoutes(authHandler, wsHandler, manager, repository)
+	routes := api.CreateRoutes(authHandler, chatHandler, wsHandler, manager, authRepository)
 
 	// create http server
 	slog.Debug("init server")

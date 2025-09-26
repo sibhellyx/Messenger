@@ -1,12 +1,15 @@
 package chathandler
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sibhellyx/Messenger/internal/models/request"
 )
 
 type ChatServiceInterface interface {
+	CreateChat(userID string, req request.CreateChatRequest) error
 }
 
 type ChatHandler struct {
@@ -21,6 +24,25 @@ func NewChatHandler(service ChatServiceInterface) *ChatHandler {
 
 // simple crud for chat
 func (h *ChatHandler) CreateChat(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.CreateChatRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+	err = h.service.CreateChat(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"result": "chat created",
+	})
 
 }
 
