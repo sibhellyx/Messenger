@@ -17,21 +17,19 @@ const (
 
 type Chat struct {
 	gorm.Model
-	Name           string    `gorm:"size:255;not null" json:"name"`
-	Description    string    `gorm:"type:text" json:"description"`
-	Type           ChatType  `gorm:"type:varchar(50);not null;default:'group'" json:"type"`
-	AvatarURL      string    `gorm:"type:varchar(500)" json:"avatarUrl"`
-	CreatedBy      uint      `gorm:"not null" json:"createdBy"` // Foreign key to User ID
-	IsPrivate      bool      `gorm:"default:false" json:"isPrivate"`
-	MaxMembers     int       `gorm:"default:100" json:"maxMembers"`
-	LastMessageID  uint      `gorm:"index" json:"lastMessageId"`
-	LastActivityAt time.Time `gorm:"default:now()" json:"lastActivityAt"`
+	Name           string     `gorm:"size:255;not null" json:"name"`
+	Description    *string    `gorm:"type:text" json:"description,omitempty"`
+	Type           ChatType   `gorm:"type:varchar(50);not null;default:'group'" json:"type"`
+	AvatarURL      *string    `gorm:"type:varchar(500)" json:"avatarUrl,omitempty"`
+	CreatedBy      uint       `gorm:"not null" json:"createdBy"`
+	IsPrivate      bool       `gorm:"default:false" json:"isPrivate"`
+	MaxMembers     int        `gorm:"default:100" json:"maxMembers"`
+	LastActivityAt *time.Time `gorm:"default:now()" json:"lastActivityAt"`
 
-	// GORM relationships
-	Creator      *User             `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
-	Participants []ChatParticipant `gorm:"foreignKey:ChatID" json:"participants,omitempty"`
-	LastMessage  *Message          `gorm:"foreignKey:LastMessageID" json:"lastMessage,omitempty"`
-	Messages     []Message         `gorm:"foreignKey:ChatID" json:"messages,omitempty"`
+	// Relationships
+	Creator      User               `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
+	Participants []*ChatParticipant `gorm:"foreignKey:ChatID" json:"participants,omitempty"`
+	Messages     []*Message         `gorm:"foreignKey:ChatID" json:"messages,omitempty"`
 }
 
 func (Chat) TableName() string {

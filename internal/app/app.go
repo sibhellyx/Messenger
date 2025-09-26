@@ -9,8 +9,8 @@ import (
 
 	"github.com/sibhellyx/Messenger/api"
 	"github.com/sibhellyx/Messenger/internal/config"
-	"github.com/sibhellyx/Messenger/internal/db"
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
+	"github.com/sibhellyx/Messenger/internal/db/migrate"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
 	wshandler "github.com/sibhellyx/Messenger/internal/transport/wsHandler"
@@ -60,7 +60,7 @@ func (srv *Server) Serve() {
 
 	// migration database
 	slog.Debug("do migration to database")
-	err = db.Migrate(srv.db)
+	err = migrate.Migrate(srv.db)
 	if err != nil {
 		slog.Error("failed to migrate database", "error", err)
 		os.Exit(1)

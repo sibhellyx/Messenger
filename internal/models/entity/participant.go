@@ -20,16 +20,14 @@ type ChatParticipant struct {
 	ChatID               uint            `gorm:"not null;index" json:"chatId"`
 	UserID               uint            `gorm:"not null;index" json:"userId"`
 	Role                 ParticipantRole `gorm:"type:varchar(50);default:'member'" json:"role"`
-	JoinedAt             time.Time       `gorm:"default:now()" json:"joinedAt"`
-	InvitedBy            uint            `gorm:"index" json:"invitedBy"`
-	LastReadMessageID    uint            `gorm:"index" json:"lastReadMessageId"`
+	JoinedAt             *time.Time      `gorm:"default:now()" json:"joinedAt"`
+	LastReadMessageID    *uint           `gorm:"index" json:"lastReadMessageId,omitempty"`
 	IsMuted              bool            `gorm:"default:false" json:"isMuted"`
 	NotificationsEnabled bool            `gorm:"default:true" json:"notificationsEnabled"`
 
 	// GORM relationships
-	Chat            *Chat    `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
-	User            *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Inviter         *User    `gorm:"foreignKey:InvitedBy" json:"inviter,omitempty"`
+	Chat            Chat     `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
+	User            User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	LastReadMessage *Message `gorm:"foreignKey:LastReadMessageID" json:"lastReadMessage,omitempty"`
 }
 

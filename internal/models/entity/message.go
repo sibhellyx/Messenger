@@ -33,18 +33,18 @@ type Message struct {
 	Status   MessageStatus `gorm:"type:varchar(50);default:'sent'" json:"status"`
 	ClientID string        `gorm:"type:varchar(100);index" json:"clientId"`
 
-	// for files and images
-	FileURL  string `gorm:"type:varchar(500)" json:"fileUrl,omitempty"`
-	FileName string `gorm:"type:varchar(255)" json:"fileName,omitempty"`
-	FileSize int64  `json:"fileSize,omitempty"`
-	MimeType string `gorm:"type:varchar(100)" json:"mimeType,omitempty"`
+	FileURL  *string `gorm:"type:varchar(500)" json:"fileUrl,omitempty"`
+	FileName *string `gorm:"type:varchar(255)" json:"fileName,omitempty"`
+	FileSize *int64  `json:"fileSize,omitempty"`
+	MimeType *string `gorm:"type:varchar(100)" json:"mimeType,omitempty"`
 
-	// GORM relationships
-	Chat      *Chat     `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
-	User      *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Replies   []Message `gorm:"foreignKey:ReplyToID" json:"replies,omitempty"`
-	ReplyToID uint      `gorm:"index" json:"replyToId,omitempty"`
-	ReplyTo   *Message  `gorm:"foreignKey:ReplyToID" json:"replyTo,omitempty"`
+	ReplyToID *uint `gorm:"index" json:"replyToId,omitempty"`
+
+	// Relationships
+	Chat    Chat       `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
+	User    User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ReplyTo *Message   `gorm:"foreignKey:ReplyToID" json:"replyTo,omitempty"`
+	Replies []*Message `gorm:"foreignKey:ReplyToID" json:"replies,omitempty"`
 }
 
 func (Message) TableName() string {
