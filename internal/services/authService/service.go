@@ -111,20 +111,14 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 	return s.createSession(u.ID, params)
 }
 
-func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginParams) (response.Tokens, error) {
+func (s *AuthService) RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error) {
 	slog.Debug("service refresh token started")
-	err := tokens.Validate()
+	err := payload.Validate()
 	if err != nil {
-		slog.Error("error validating tokens", "error", err.Error())
+		slog.Error("error validating payload data from access token and refresh token", "error", err.Error())
 		return response.Tokens{}, err
 	}
-	refreshTokenHash := s.hasher.HashRefreshToken(tokens.RefreshToken)
-
-	payload, err := s.tokenManager.Parse(tokens.AccessToken)
-	if err != nil {
-		slog.Error("failed parse access token", "error", err.Error())
-		return response.Tokens{}, errors.New("failed parse access token")
-	}
+	refreshTokenHash := s.hasher.HashRefreshToken(payload.RefreshToken)
 
 	session, err := s.repository.FindJwtSessionByUuidAndRefreshToken(payload.Uuid, refreshTokenHash)
 	if err != nil {
@@ -132,7 +126,7 @@ func (s *AuthService) RefreshToken(tokens response.Tokens, params request.LoginP
 		return response.Tokens{}, errors.New("failed found session")
 	}
 	if session == nil {
-		slog.Debug("session with this uuid and refresh token not found", "user_id", payload.UserId, "uuid", payload.Uuid, "refresh_token", tokens.RefreshToken)
+		slog.Debug("session with this uuid and refresh token not found", "user_id", payload.UserId, "uuid", payload.Uuid, "refresh_token", payload.RefreshToken)
 		return response.Tokens{}, errors.New("this session not found or this refresh token was issued separately")
 	}
 	if session.UserAgent != params.UserAgent {

@@ -3,17 +3,17 @@ package authhandler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
+	"github.com/sibhellyx/Messenger/internal/models/payload"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 	"github.com/sibhellyx/Messenger/internal/models/response"
 )
 
 type AuthServiceInterface interface {
 	Logout(userId string, uuid string) error
-	RefreshToken(tokens response.Tokens, params request.LoginParams) (response.Tokens, error)
+	RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error)
 	RegisterUser(user entity.User) error
 	SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error)
 }
@@ -74,12 +74,16 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	access := c.GetHeader("Authorization")
-	if !strings.HasPrefix(access, "Bearer ") {
-		c.AbortWithStatusJSON(401, gin.H{"error": "Invalid authorization header"})
+	uuid, exist := c.Get("uuid")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
-	access = strings.TrimPrefix(access, "Bearer ")
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	var req request.RefreshTokenRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&req)
@@ -96,12 +100,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		LastIp:    ip,
 	}
 
-	tokensForRefresh := response.Tokens{
-		AccessToken:  access,
+	payload := payload.PayloadForRefresh{
+		UserId:       userId.(string),
+		Uuid:         uuid.(string),
 		RefreshToken: req.RefreshToken,
 	}
 
-	tokens, err := h.service.RefreshToken(tokensForRefresh, params)
+	tokens, err := h.service.RefreshToken(payload, params)
 	if err != nil {
 		WrapError(c, err)
 		return
