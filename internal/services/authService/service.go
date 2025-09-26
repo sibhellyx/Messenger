@@ -68,19 +68,25 @@ func NewAuthService(
 }
 
 // register user service layer
-func (s *AuthService) RegisterUser(user entity.User) error {
+func (s *AuthService) RegisterUser(r request.RegisterRequest) error {
 	slog.Debug("service register started")
-	err := user.Validate() //function return error if user not isValid
+	err := r.Validate() //function return error if user not isValid
 	if err != nil {
 		slog.Error("error validating user input", "error", err.Error())
 		return err
 	}
-	user.Password, err = s.hasher.Hash(user.Password) //hash password
+	r.Password, err = s.hasher.Hash(r.Password) //hash password
 	if err != nil {
 		slog.Error("failed hash password", "error", err.Error())
 		return err
 	}
-	err = s.repository.CreateUser(user) //write to repo
+
+	err = s.repository.CreateUser(entity.User{
+		Name:     r.Name,
+		Surname:  r.Surname,
+		Tgname:   r.Tgname,
+		Password: r.Password,
+	}) //write to repo
 	if err != nil {
 		slog.Error("failed create user in repo", "error", err.Error())
 		return err

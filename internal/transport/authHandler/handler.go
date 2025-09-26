@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/payload"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 	"github.com/sibhellyx/Messenger/internal/models/response"
@@ -14,7 +13,7 @@ import (
 type AuthServiceInterface interface {
 	Logout(userId string, uuid string) error
 	RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error)
-	RegisterUser(user entity.User) error
+	RegisterUser(user request.RegisterRequest) error
 	SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error)
 }
 
@@ -29,7 +28,7 @@ func NewAuthHandler(service AuthServiceInterface) *AuthHandler {
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
-	var user entity.User
+	var user request.RegisterRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&user)
 	if err != nil {
 		WrapError(c, err)
