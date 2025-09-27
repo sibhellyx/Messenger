@@ -8,7 +8,7 @@ import (
 )
 
 type CreateChatRequest struct {
-	Name         string          `json:"name"`
+	Name         string          `json:"name,omitempty"`
 	Description  *string         `json:"description,omitempty"`
 	Type         entity.ChatType `json:"type,omitempty"`
 	IsPrivate    bool            `json:"is_private,omitempty"`
@@ -21,14 +21,29 @@ type Participant struct {
 
 func (r CreateChatRequest) Validate() error {
 	slog.Debug("validating creating chat input")
+	// if directed chat
+	if r.Type == entity.ChatTypeDirect {
+		if len(r.Participants) != 1 {
+			slog.Error("directed chat is require only 1 participant")
+			return errors.New("directed chat is require only 1 participant")
+		}
+		if r.Description != nil {
+			slog.Error("directed chat сannot have descriptions")
+			return errors.New("directed chat сannot have descriptions")
+		}
+		if r.Name != "" {
+			slog.Error("directed chat cannot have name")
+			return errors.New("directed chat cannot have name")
+		}
+		return nil
+	}
+
+	// if group or channel
 	if r.Name == "" {
 		slog.Error("name is required")
 		return errors.New("name chat is required")
 	}
-	if r.Type == entity.ChatTypeDirect && len(r.Participants) != 1 {
-		slog.Error("directed chat is require only 1 participant")
-		return errors.New("directed chat is require only 1 participant")
-	}
+
 	slog.Debug("validating creating caht input completed")
 	return nil
 }

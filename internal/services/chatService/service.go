@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sibhellyx/Messenger/internal/models/chaterrors"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 )
@@ -13,6 +14,8 @@ import (
 type ChatRepositoryInterface interface {
 	CreateChat(chat entity.Chat) (*entity.Chat, error)
 	AddParticipant(participant entity.ChatParticipant) error
+	DeleteChat(chatID uint) error
+	DirectedChatCreated(firstId, secondId uint) (uint, error)
 }
 
 type ChatService struct {
@@ -25,20 +28,33 @@ func NewChatService(repository ChatRepositoryInterface) *ChatService {
 	}
 }
 
-func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) error {
+func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (uint, error) {
 	slog.Debug("start creating chat")
 	err := req.Validate()
 	if err != nil {
 		slog.Error("failed validate request", "error", err)
-		return err
+		return 0, err
 	}
 
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return errors.New("invalid user_id")
+		return 0, errors.New("invalid user_id")
 	}
 	time := time.Now()
+
+	// if chat directed need set 2 members for max check whether it has already been created
+	maxMembers := 100
+	if req.Type != "" && req.Type == "direct" {
+		maxMembers = 2
+		chatId, err := s.repository.DirectedChatCreated(uint(id), req.Participants[0].ID)
+		if err != nil {
+			return 0, err
+		}
+		if chatId != 0 {
+			return chatId, nil
+		}
+	}
 
 	chat := entity.Chat{
 		Name:           req.Name,
@@ -46,13 +62,13 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) e
 		Type:           req.Type,
 		IsPrivate:      req.IsPrivate,
 		CreatedBy:      uint(id),
-		MaxMembers:     100,
+		MaxMembers:     maxMembers,
 		LastActivityAt: &time,
 	}
 	// create chat
 	createdChat, err := s.repository.CreateChat(chat)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// set role of creator and member
 	creatorRole := entity.RoleOwner
@@ -61,6 +77,14 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) e
 	if createdChat.Type == entity.ChatTypeDirect {
 		creatorRole = entity.RoleAdmin
 		memberRole = entity.RoleAdmin
+		// also need check if user want create chat with yourself
+		if req.Participants[0].ID == uint(id) {
+			err := s.repository.DeleteChat(createdChat.ID)
+			if err != nil {
+				return 0, err
+			}
+			return 0, chaterrors.ErrCreatingChatWithYourself
+		}
 	}
 	slog.Debug("seted role for creator", "creator_id", createdChat.CreatedBy, "creator role", creatorRole)
 	// add creator
@@ -71,7 +95,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) e
 	}
 	err = s.repository.AddParticipant(creator)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// add participant
@@ -88,5 +112,5 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) e
 	}
 
 	slog.Debug("creating chat completed")
-	return nil
+	return createdChat.ID, nil
 }
