@@ -15,6 +15,20 @@ type CreateChatRequest struct {
 	Participants []Participant   `json:"participants,omitempty"`
 }
 
+type ChatRequest struct {
+	Id string `json:"chat_id"`
+}
+
+func (r ChatRequest) Validate() error {
+	slog.Debug("validating chat request")
+	if r.Id == "" {
+		slog.Error("id is required")
+		return errors.New("id is required")
+	}
+	slog.Debug("validating chat request completed")
+	return nil
+}
+
 type Participant struct {
 	ID uint `json:"id"`
 }

@@ -34,6 +34,12 @@ func (r *ChatRepository) CreateChat(chat entity.Chat) (*entity.Chat, error) {
 
 func (r *ChatRepository) DeleteChat(chatID uint) error {
 	slog.Debug("deleting chat", "chat_id", chatID)
+
+	if !r.chatExists(chatID) {
+		slog.Warn("chat not found", "chat_id", chatID)
+		return chaterrors.ErrChatNotFound
+	}
+
 	err := r.deleteAllParticipantsFromChat(chatID)
 	if err != nil {
 		return err

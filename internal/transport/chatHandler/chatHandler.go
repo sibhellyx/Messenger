@@ -11,6 +11,7 @@ import (
 
 type ChatServiceInterface interface {
 	CreateChat(userID string, req request.CreateChatRequest) (uint, error)
+	DeleteChat(userID string, req request.ChatRequest) error
 }
 
 type ChatHandler struct {
@@ -57,7 +58,27 @@ func (h *ChatHandler) UpdateChat(c *gin.Context) {
 }
 
 func (h *ChatHandler) DeleteChat(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ChatRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	err = h.service.DeleteChat(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"result": "chat deleted",
+	})
 }
 
 // gets chats all or user chats

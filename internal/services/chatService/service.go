@@ -118,3 +118,33 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	slog.Debug("creating chat completed")
 	return createdChat.ID, nil
 }
+
+func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {
+	slog.Debug("chat deleting start")
+	err := req.Validate()
+	if err != nil {
+		slog.Error("failed validate request", "error", err)
+		return err
+	}
+	// id, err := strconv.ParseUint(userID, 10, 32)
+	// if err != nil {
+	// 	slog.Error("failed parse user_id to uint", "user_id", userID)
+	// 	return errors.New("invalid user_id")
+	// }
+	// we need check user and his role for can he delete or not
+
+	chatId, err := strconv.ParseUint(req.Id, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "user_id", userID)
+		return errors.New("invalid chat_id")
+	}
+
+	err = s.repository.DeleteChat(uint(chatId))
+	if err != nil {
+		slog.Error("failed delete chat", "chat_id", chatId, "deleter_id", userID)
+		return err
+	}
+
+	slog.Debug("deleting chat completed")
+	return nil
+}

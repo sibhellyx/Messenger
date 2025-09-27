@@ -18,6 +18,7 @@ type WsHandlerInterface interface {
 
 type ChatHandlerInterface interface {
 	CreateChat(c *gin.Context)
+	DeleteChat(c *gin.Context)
 }
 
 func CreateRoutes(
@@ -38,6 +39,7 @@ func CreateRoutes(
 
 	// chat enpoints
 	r.POST("/chat/create", middleware.AuthMiddleware(m, repo), chatHandler.CreateChat)
+	r.DELETE("/chat", middleware.AuthMiddleware(m, repo), chatHandler.DeleteChat)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)
