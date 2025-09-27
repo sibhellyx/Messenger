@@ -79,7 +79,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		memberRole = entity.RoleAdmin
 		// also need check if user want create chat with yourself
 		if req.Participants[0].ID == uint(id) {
-			err := s.repository.DeleteChat(createdChat.ID)
+			err = s.repository.DeleteChat(createdChat.ID)
 			if err != nil {
 				return 0, err
 			}
@@ -95,6 +95,10 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	}
 	err = s.repository.AddParticipant(creator)
 	if err != nil {
+		err = s.repository.DeleteChat(createdChat.ID)
+		if err != nil {
+			return 0, err
+		}
 		return 0, err
 	}
 

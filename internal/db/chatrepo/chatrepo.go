@@ -119,10 +119,6 @@ func (r *ChatRepository) DirectedChatCreated(firstId, secondId uint) (uint, erro
 		"first_user", firstId,
 		"second_user", secondId)
 
-	if !r.userExist(firstId) || !r.userExist(secondId) {
-		return 0, chaterrors.ErrCheckTwoUsersNotFound
-	}
-
 	var result struct {
 		ChatID uint `gorm:"column:id"`
 	}
