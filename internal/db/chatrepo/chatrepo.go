@@ -148,6 +148,55 @@ func (r *ChatRepository) DirectedChatCreated(firstId, secondId uint) (uint, erro
 	return result.ChatID, nil
 }
 
+func (r *ChatRepository) GetChatById(chatID uint) (*entity.Chat, error) {
+	slog.Debug("get chat by id", "chat_id", chatID)
+	var chat entity.Chat
+	err := r.db.First(&chat, chatID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, chaterrors.ErrChatNotFound
+		}
+		slog.Error("failed to get chat", "chat_id", chatID, "error", err)
+		return nil, chaterrors.ErrFailedGetChat
+	}
+	return &chat, nil
+}
+
+func (r *ChatRepository) UpdateChat(chat *entity.Chat) (*entity.Chat, error) {
+	slog.Debug("updating chat", "chat_id", chat.ID)
+
+	result := r.db.Save(chat)
+	if result.Error != nil {
+		slog.Error("failed to update chat",
+			"chat_id", chat.ID,
+			"error", result.Error)
+		return nil, chaterrors.ErrFailedUpdateChat
+	}
+
+	slog.Info("chat updated successfully",
+		"chat_id", chat.ID,
+		"chat_name", chat.Name)
+	return chat, nil
+
+}
+
+func (r *ChatRepository) UserCanChange(userID, chatID uint) (bool, error) {
+	var participant entity.ChatParticipant
+	err := r.db.
+		Where("chat_id = ? AND user_id = ?", chatID, userID).
+		First(&participant).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		slog.Error("failed to get chat participant", "chat_id", chatID, "user_id", userID, "error", err)
+		return false, chaterrors.ErrFailedGetParticipant
+	}
+
+	return participant.Role == entity.RoleOwner || participant.Role == entity.RoleAdmin, nil
+}
+
 func (r *ChatRepository) userExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)

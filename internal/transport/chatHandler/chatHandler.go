@@ -6,12 +6,14 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 )
 
 type ChatServiceInterface interface {
 	CreateChat(userID string, req request.CreateChatRequest) (uint, error)
 	DeleteChat(userID string, req request.ChatRequest) error
+	UpdateChat(userID string, req request.UpdateChatRequest) (*entity.Chat, error)
 }
 
 type ChatHandler struct {
@@ -54,7 +56,28 @@ func (h *ChatHandler) GetChat(c *gin.Context) {
 }
 
 func (h *ChatHandler) UpdateChat(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.UpdateChatRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	updatedChat, err := h.service.UpdateChat(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"result": "chat updated",
+		"chat":   updatedChat,
+	})
 }
 
 func (h *ChatHandler) DeleteChat(c *gin.Context) {

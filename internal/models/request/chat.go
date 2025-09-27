@@ -11,8 +11,25 @@ type CreateChatRequest struct {
 	Name         string          `json:"name,omitempty"`
 	Description  *string         `json:"description,omitempty"`
 	Type         entity.ChatType `json:"type,omitempty"`
+	AvatarURL    *string         `json:"avatarUrl,omitempty"`
 	IsPrivate    bool            `json:"is_private,omitempty"`
 	Participants []Participant   `json:"participants,omitempty"`
+}
+
+type UpdateChatRequest struct {
+	Id          string  `json:"chat_id"`
+	Name        string  `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	AvatarURL   *string `json:"avatarUrl,omitempty"`
+	IsPrivate   bool    `json:"is_private,omitempty"`
+}
+
+func (r UpdateChatRequest) Validate() error {
+	if r.Id == "" {
+		slog.Error("chat_id is required")
+		return errors.New("chat_id is required")
+	}
+	return nil
 }
 
 type ChatRequest struct {
@@ -49,6 +66,10 @@ func (r CreateChatRequest) Validate() error {
 			slog.Error("directed chat cannot have name")
 			return errors.New("directed chat cannot have name")
 		}
+		if r.AvatarURL != nil {
+			slog.Error("directed chat сannot have avatar")
+			return errors.New("directed chat сannot have descriptions")
+		}
 		return nil
 	}
 
@@ -57,6 +78,7 @@ func (r CreateChatRequest) Validate() error {
 		slog.Error("name is required")
 		return errors.New("name chat is required")
 	}
+	// add validate url
 
 	slog.Debug("validating creating caht input completed")
 	return nil

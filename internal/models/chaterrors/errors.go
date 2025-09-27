@@ -13,4 +13,7 @@ var (
 	ErrFullChat                 = errors.New("chat is full, there are no free spots for participants")
 	ErrCheckTwoUsersNotFound    = errors.New("one or both users not found")
 	ErrFailedCheckDirectedChat  = errors.New("failed to check directed chat")
+	ErrFailedGetChat            = errors.New("failed to get chat")
+	ErrFailedUpdateChat         = errors.New("failed to update chat")
+	ErrFailedGetParticipant     = errors.New("failed get participant")
 )
