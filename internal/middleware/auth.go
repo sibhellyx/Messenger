@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"strings"
 	"time"
 
@@ -20,9 +21,16 @@ type SessionRepositoryInterface interface {
 
 func AuthMiddleware(m JwtManagerInterface, s SessionRepositoryInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
 		token := c.GetHeader("Authorization")
 		if !strings.HasPrefix(token, "Bearer ") {
 			c.AbortWithStatusJSON(401, gin.H{"error": "Invalid authorization header"})
+			return
+		}
+
+		if token == "" {
+			slog.Warn("missing authorization header")
+			c.AbortWithStatusJSON(401, gin.H{"error": "Authorization header required"})
 			return
 		}
 
