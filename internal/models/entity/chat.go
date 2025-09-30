@@ -27,7 +27,7 @@ type Chat struct {
 	LastActivityAt *time.Time `gorm:"default:now()" json:"lastActivityAt"`
 
 	// Relationships
-	Creator      User               `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
+	Creator      *User              `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
 	Participants []*ChatParticipant `gorm:"foreignKey:ChatID" json:"participants,omitempty"`
 	Messages     []*Message         `gorm:"foreignKey:ChatID" json:"messages,omitempty"`
 }
