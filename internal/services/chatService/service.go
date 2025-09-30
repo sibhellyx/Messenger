@@ -12,13 +12,22 @@ import (
 )
 
 type ChatRepositoryInterface interface {
+	//creaating new chat
 	CreateChat(chat entity.Chat) (*entity.Chat, error)
-	AddParticipant(participant entity.ChatParticipant) error
+	// deleting chat
 	DeleteChat(chatID uint) error
+	// add participant to chat(use in create and can uce for add to private chat from user)
+	AddParticipant(participant entity.ChatParticipant) error
+	// check chat, it can be created by another user
 	DirectedChatCreated(firstId, secondId uint) (uint, error)
+	// get chat by id
 	GetChatById(chatID uint) (*entity.Chat, error)
-	UpdateChat(chat *entity.Chat) (*entity.Chat, error)
+	// check role user for changing and deleting chat
 	UserCanChange(userID, chatID uint) (bool, error)
+	// update information about chat
+	UpdateChat(chat *entity.Chat) (*entity.Chat, error)
+	// get chats user
+	GetUserChats(userID uint) ([]*entity.Chat, error)
 }
 
 type ChatService struct {
@@ -219,4 +228,13 @@ func (s *ChatService) UpdateChat(userID string, req request.UpdateChatRequest) (
 	slog.Debug("chat updated successfully", "chat_id", chatId)
 	return updatedChat, nil
 
+}
+
+func (s *ChatService) GetChatsUser(userID string) ([]*entity.Chat, error) {
+	id, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", userID)
+		return nil, errors.New("invalid user_id")
+	}
+	return s.repository.GetUserChats(uint(id))
 }

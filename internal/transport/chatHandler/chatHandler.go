@@ -14,6 +14,7 @@ type ChatServiceInterface interface {
 	CreateChat(userID string, req request.CreateChatRequest) (uint, error)
 	DeleteChat(userID string, req request.ChatRequest) error
 	UpdateChat(userID string, req request.UpdateChatRequest) (*entity.Chat, error)
+	GetChatsUser(userID string) ([]*entity.Chat, error)
 }
 
 type ChatHandler struct {
@@ -48,10 +49,6 @@ func (h *ChatHandler) CreateChat(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"chat_id": strconv.FormatUint(uint64(id), 10),
 	})
-
-}
-
-func (h *ChatHandler) GetChat(c *gin.Context) {
 
 }
 
@@ -110,7 +107,29 @@ func (h *ChatHandler) GetChats(c *gin.Context) {
 }
 
 func (h *ChatHandler) GetUserChats(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	chats, err := h.service.GetChatsUser(userId.(string))
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+	if len(chats) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"chats":   []string{},
+			"count":   0,
+			"message": "user has no chats",
+		})
+		return
+	}
 
+	c.JSON(http.StatusOK, gin.H{
+		"chats": chats,
+		"count": len(chats),
+	})
 }
 
 func (h *ChatHandler) FindChats(c *gin.Context) {

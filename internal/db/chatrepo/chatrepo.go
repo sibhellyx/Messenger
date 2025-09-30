@@ -197,6 +197,41 @@ func (r *ChatRepository) UserCanChange(userID, chatID uint) (bool, error) {
 	return participant.Role == entity.RoleOwner || participant.Role == entity.RoleAdmin, nil
 }
 
+func (r *ChatRepository) GetUserChats(userID uint) ([]*entity.Chat, error) {
+	slog.Debug("getting user chats", "user_id", userID)
+
+	var chats []*entity.Chat
+
+	var chatIDs []uint
+	err := r.db.Model(&entity.ChatParticipant{}).
+		Where("user_id = ? AND deleted_at IS NULL", userID).
+		Pluck("chat_id", &chatIDs).Error
+
+	if err != nil {
+		slog.Error("failed to get user chat IDs", "user_id", userID, "error", err)
+		return nil, chaterrors.ErrFailedGetChats
+	}
+	// if user has not chats
+	if len(chatIDs) == 0 {
+		slog.Debug("user has no chats", "user_id", userID)
+		return []*entity.Chat{}, nil
+	}
+	// get all chats user
+	err = r.db.
+		Where("id IN (?)", chatIDs).
+		Find(&chats).Error
+
+	if err != nil {
+		slog.Error("failed to get user chats", "user_id", userID, "error", err)
+		return nil, chaterrors.ErrFailedGetChats
+	}
+
+	slog.Debug("successfully retrieved user chats",
+		"user_id", userID,
+		"chat_count", len(chats))
+	return chats, nil
+}
+
 func (r *ChatRepository) userExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)

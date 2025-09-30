@@ -16,4 +16,5 @@ var (
 	ErrFailedGetChat            = errors.New("failed to get chat")
 	ErrFailedUpdateChat         = errors.New("failed to update chat")
 	ErrFailedGetParticipant     = errors.New("failed get participant")
+	ErrFailedGetChats           = errors.New("failed get chats")
 )
