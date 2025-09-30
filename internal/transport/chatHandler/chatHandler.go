@@ -136,12 +136,6 @@ func (h *ChatHandler) FindChats(c *gin.Context) {
 
 }
 
-// chat with users actions endpoints
-// join to open chat
-func (h *ChatHandler) JoinChat(c *gin.Context) {
-
-}
-
 // leave from chat
 func (h *ChatHandler) LeaveChat(c *gin.Context) {
 
