@@ -20,7 +20,7 @@ type ChatRepositoryInterface interface {
 	// add participant to chat(use in create and can uce for add to private chat from user)
 	AddParticipant(participant entity.ChatParticipant) error
 	// check chat, it can be created by another user
-	DirectedChatCreated(firstId, secondId uint) (uint, error)
+	DirectedChatCreated(firstId, secondId uint) (*entity.Chat, error)
 	// get chat by id
 	GetChatById(chatID uint) (*entity.Chat, error)
 	// check role user for changing and deleting chat
@@ -45,36 +45,38 @@ func NewChatService(repository ChatRepositoryInterface) *ChatService {
 	}
 }
 
-func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (uint, error) {
+func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (*entity.Chat, error) {
 	slog.Debug("start creating chat")
 	err := req.Validate()
 	if err != nil {
 		slog.Error("failed validate request", "error", err)
-		return 0, err
+		return nil, err
 	}
 
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return 0, errors.New("invalid user_id")
+		return nil, errors.New("invalid user_id")
 	}
 	time := time.Now()
 
 	// if chat directed need set 2 members for max check whether it has already been created
 	maxMembers := 100
-	if req.Type != "" && req.Type == "direct" {
+	if req.Type != "" && req.Type == entity.ChatTypeDirect {
 		maxMembers = 2
 		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return 0, errors.New("invalid user_id")
+			return nil, errors.New("invalid user_id")
 		}
-		chatId, err := s.repository.DirectedChatCreated(uint(id), uint(userId))
+
+		chat, err := s.repository.DirectedChatCreated(uint(id), uint(userId))
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
-		if chatId != 0 {
-			return chatId, nil
+
+		if chat != nil {
+			return chat, nil
 		}
 	}
 
@@ -90,7 +92,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	// create chat
 	createdChat, err := s.repository.CreateChat(chat)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	// set role of creator and member
 	creatorRole := entity.RoleOwner
@@ -103,14 +105,14 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return 0, errors.New("invalid user_id")
+			return nil, errors.New("invalid user_id")
 		}
 		if uint(userId) == uint(id) {
 			err = s.repository.DeleteChat(createdChat.ID)
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
-			return 0, chaterrors.ErrCreatingChatWithYourself
+			return nil, chaterrors.ErrCreatingChatWithYourself
 		}
 	}
 	slog.Debug("seted role for creator", "creator_id", createdChat.CreatedBy, "creator role", creatorRole)
@@ -124,9 +126,9 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	if err != nil {
 		err = s.repository.DeleteChat(createdChat.ID)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
-		return 0, err
+		return nil, err
 	}
 
 	// add participant
@@ -134,7 +136,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		userId, err := strconv.ParseUint(p.ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return 0, errors.New("invalid user_id")
+			return nil, errors.New("invalid user_id")
 		}
 		participant := entity.ChatParticipant{
 			ChatID: createdChat.ID,
@@ -148,7 +150,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	}
 
 	slog.Debug("creating chat completed", "chat_id", createdChat.ID)
-	return createdChat.ID, nil
+	return createdChat, nil
 }
 
 func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {

@@ -125,33 +125,32 @@ func (r *ChatRepository) deleteAllParticipantsFromChat(chatID uint) error {
 	return nil
 }
 
-// fix creating new chat with user after deleted (not created) and add for name chat unique id maybe
-func (r *ChatRepository) DirectedChatCreated(firstId, secondId uint) (uint, error) {
+func (r *ChatRepository) DirectedChatCreated(firstId, secondId uint) (*entity.Chat, error) {
 	slog.Debug("checking directed chat existence",
 		"first_user", firstId,
 		"second_user", secondId)
 
-	var result struct {
-		ChatID uint `gorm:"column:id"`
-	}
+	var chat entity.Chat
 
-	err := r.db.Table("chats").
-		Select("chats.id").
-		Joins("JOIN chat_participants cp ON cp.chat_id = chats.id").
-		Where("chats.type = ?", entity.ChatTypeDirect).
-		Where("cp.user_id IN (?, ?)", firstId, secondId).
-		Group("chats.id").
-		Having("COUNT(DISTINCT cp.user_id) = 2").
-		Scan(&result).Error
+	subquery := r.db.Table("chat_participants").
+		Select("chat_id").
+		Where("user_id IN (?, ?) AND deleted_at IS NULL", firstId, secondId).
+		Group("chat_id").
+		Having("COUNT(DISTINCT user_id) = 2")
+
+	err := r.db.
+		Where("id IN (?) AND type = ? AND deleted_at IS NULL", subquery, entity.ChatTypeDirect).
+		First(&chat).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, nil
+			return nil, nil
 		}
-		return 0, chaterrors.ErrFailedCheckDirectedChat
+		return nil, chaterrors.ErrFailedCheckDirectedChat
 	}
 
-	return result.ChatID, nil
+	slog.Debug("directed chat found", "chat_id", chat.ID)
+	return &chat, nil
 }
 
 func (r *ChatRepository) GetChatById(chatID uint) (*entity.Chat, error) {

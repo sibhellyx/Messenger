@@ -11,7 +11,7 @@ import (
 )
 
 type ChatServiceInterface interface {
-	CreateChat(userID string, req request.CreateChatRequest) (uint, error)
+	CreateChat(userID string, req request.CreateChatRequest) (*entity.Chat, error)
 	DeleteChat(userID string, req request.ChatRequest) error
 	UpdateChat(userID string, req request.UpdateChatRequest) (*entity.Chat, error)
 	GetChatsUser(userID string) ([]*entity.Chat, error)
@@ -43,16 +43,16 @@ func (h *ChatHandler) CreateChat(c *gin.Context) {
 		WrapError(c, err)
 		return
 	}
-	id, err := h.service.CreateChat(userId.(string), req)
+	chat, err := h.service.CreateChat(userId.(string), req)
 	if err != nil {
 		WrapError(c, err)
 		return
 	}
-	if id == 0 {
+	if chat == nil {
 		WrapError(c, errors.New("failed create chat"))
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"chat_id": id,
+		"chat": chat,
 	})
 
 }
