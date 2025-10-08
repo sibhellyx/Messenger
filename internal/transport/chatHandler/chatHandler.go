@@ -2,6 +2,7 @@ package chathandler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -16,6 +17,7 @@ type ChatServiceInterface interface {
 	UpdateChat(userID string, req request.UpdateChatRequest) (*entity.Chat, error)
 	GetChatsUser(userID string) ([]*entity.Chat, error)
 	GetChats() ([]*entity.Chat, error)
+	SearchChatsByName(name string) ([]*entity.Chat, error)
 }
 
 type ChatHandler struct {
@@ -159,6 +161,28 @@ func (h *ChatHandler) GetUserChats(c *gin.Context) {
 }
 
 func (h *ChatHandler) FindChats(c *gin.Context) {
+	name := c.Query("name")
+
+	if name == "" {
+		WrapError(c, errors.New("name parameter is required"))
+		return
+	}
+
+	if len(name) > 100 {
+		WrapError(c, errors.New("search query too long"))
+		return
+	}
+
+	chats, err := h.service.SearchChatsByName(name)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"chats": chats,
+		"count": len(chats),
+	})
 
 }
 

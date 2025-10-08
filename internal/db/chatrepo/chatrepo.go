@@ -232,7 +232,7 @@ func (r *ChatRepository) GetUserChats(userID uint) ([]*entity.Chat, error) {
 	return chats, nil
 }
 
-func (r *ChatRepository)GetChats() ([]*entity.Chat, error){
+func (r *ChatRepository) GetChats() ([]*entity.Chat, error) {
 	slog.Debug("getting all chats")
 	var chats []*entity.Chat
 
@@ -247,7 +247,28 @@ func (r *ChatRepository)GetChats() ([]*entity.Chat, error){
 
 	slog.Debug("successfully retrieved all chats",
 		"chat_count", len(chats))
-		
+
+	return chats, nil
+}
+
+// soon add pagination
+func (r *ChatRepository) FindChatsByName(name string) ([]*entity.Chat, error) {
+	slog.Debug("searching chats by name", "name", name)
+
+	var chats []*entity.Chat
+
+	err := r.db.
+		Where("name LIKE ? AND deleted_at IS NULL", "%"+name+"%").
+		Find(&chats).Error
+
+	if err != nil {
+		slog.Error("failed to search chats by name", "name", name, "error", err)
+		return nil, chaterrors.ErrFailedGetChats
+	}
+
+	slog.Debug("successfully searched chats by name",
+		"name", name,
+		"chat_count", len(chats))
 	return chats, nil
 }
 

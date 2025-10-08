@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sibhellyx/Messenger/internal/models/chaterrors"
@@ -29,7 +30,9 @@ type ChatRepositoryInterface interface {
 	// get chats user
 	GetUserChats(userID uint) ([]*entity.Chat, error)
 	// get all chats
-	GetChats()([]*entity.Chat, error)
+	GetChats() ([]*entity.Chat, error)
+	// geting chats by name searching
+	FindChatsByName(name string) ([]*entity.Chat, error)
 }
 
 type ChatService struct {
@@ -241,6 +244,14 @@ func (s *ChatService) GetChatsUser(userID string) ([]*entity.Chat, error) {
 	return s.repository.GetUserChats(uint(id))
 }
 
-func (s *ChatService) GetChats()([]*entity.Chat, error){
+func (s *ChatService) GetChats() ([]*entity.Chat, error) {
 	return s.repository.GetChats()
+}
+
+func (s *ChatService) SearchChatsByName(name string) ([]*entity.Chat, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.New("invalid searching name")
+	}
+
+	return s.repository.FindChatsByName(name)
 }
