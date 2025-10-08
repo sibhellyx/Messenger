@@ -6,6 +6,7 @@ var (
 	ErrFailedCreateChat         = errors.New("failed create chat")
 	ErrUserNotFound             = errors.New("user not found")
 	ErrChatNotFound             = errors.New("chat not found")
+	ErrChatIsDirected           = errors.New("chat is directed, can't add participant")
 	ErrAlreadyParticipant       = errors.New("user is already a participant of this chat")
 	ErrCreatingChatWithYourself = errors.New("failed creating a chat with yourself")
 	ErrDeletingAllParticipants  = errors.New("failed delete all participants")

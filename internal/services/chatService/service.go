@@ -255,3 +255,35 @@ func (s *ChatService) SearchChatsByName(name string) ([]*entity.Chat, error) {
 
 	return s.repository.FindChatsByName(name)
 }
+
+func (s *ChatService) AddParticipant(userID string, req request.ParticipantAddRequest) error {
+	slog.Debug("add participant to chat", "chat_id", req.Id, "adder_id", userID, "new_participant", req.Id)
+
+	// add Validate
+
+	chatId, err := strconv.ParseUint(req.Id, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", req.Id)
+		return errors.New("invalid chat_id")
+	}
+
+	newUser, err := strconv.ParseUint(req.NewUserId, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "new_user_id", req.NewUserId)
+		return errors.New("invalid new_participant_id")
+	}
+
+	participant := entity.ChatParticipant{
+		ChatID: uint(chatId),
+		UserID: uint(newUser),
+		Role:   entity.RoleMember,
+	}
+
+	err = s.repository.AddParticipant(participant)
+	if err != nil {
+		slog.Warn("failed add member", "error", err)
+		return err
+	}
+
+	return nil
+}

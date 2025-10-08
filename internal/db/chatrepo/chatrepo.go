@@ -76,6 +76,11 @@ func (r *ChatRepository) AddParticipant(participant entity.ChatParticipant) erro
 	}
 
 	if !r.checkAvailibleForAddParticipantToChat(participant.ChatID) {
+		// check if chat directed
+		if !r.checkChatDirected(participant.ChatID) {
+			slog.Warn("chat is directed", "chat_id", participant.ChatID)
+			return chaterrors.ErrChatIsDirected
+		}
 		slog.Warn("chat is full", "chat_id", participant.ChatID)
 		return chaterrors.ErrFullChat
 	}
@@ -120,6 +125,7 @@ func (r *ChatRepository) deleteAllParticipantsFromChat(chatID uint) error {
 	return nil
 }
 
+// fix creating new chat with user after deleted (not created) and add for name chat unique id maybe
 func (r *ChatRepository) DirectedChatCreated(firstId, secondId uint) (uint, error) {
 	slog.Debug("checking directed chat existence",
 		"first_user", firstId,
@@ -299,4 +305,12 @@ func (r *ChatRepository) checkAvailibleForAddParticipantToChat(chatID uint) bool
 
 	availibleCount := maxMembers - int(count)
 	return availibleCount > 0
+}
+
+func (r *ChatRepository) checkChatDirected(chatID uint) bool {
+	var typeChat entity.ChatType
+
+	r.db.Model(&entity.Chat{}).Where("id = ?", chatID).Select("type").Scan(&typeChat)
+
+	return typeChat != entity.ChatTypeDirect
 }

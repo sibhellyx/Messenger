@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
@@ -18,6 +17,7 @@ type ChatServiceInterface interface {
 	GetChatsUser(userID string) ([]*entity.Chat, error)
 	GetChats() ([]*entity.Chat, error)
 	SearchChatsByName(name string) ([]*entity.Chat, error)
+	AddParticipant(userID string, req request.ParticipantAddRequest) error
 }
 
 type ChatHandler struct {
@@ -48,9 +48,11 @@ func (h *ChatHandler) CreateChat(c *gin.Context) {
 		WrapError(c, err)
 		return
 	}
-
+	if id == 0 {
+		WrapError(c, errors.New("failed create chat"))
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"chat_id": strconv.FormatUint(uint64(id), 10),
+		"chat_id": id,
 	})
 
 }
@@ -197,8 +199,28 @@ func (h *ChatHandler) GetChatParticipants(c *gin.Context) {
 }
 
 // add member to chat
-func (h *ChatHandler) AddParticipants(c *gin.Context) {
+func (h *ChatHandler) AddParticipant(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ParticipantAddRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	err = h.service.AddParticipant(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_id": req.Id,
+	})
 }
 
 // remove member from chat
