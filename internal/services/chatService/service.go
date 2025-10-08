@@ -33,6 +33,13 @@ type ChatRepositoryInterface interface {
 	GetChats() ([]*entity.Chat, error)
 	// geting chats by name searching
 	FindChatsByName(name string) ([]*entity.Chat, error)
+
+	// some functions for checking
+	ChatExists(chatID uint) bool
+	CheckAvailibleForAddParticipantToChat(chatID uint) bool
+	CheckChatDirected(chatID uint) bool
+	ParticipantExist(userID, chatID uint) bool
+	UserExist(userID uint) bool
 }
 
 type ChatService struct {
@@ -117,12 +124,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	}
 	slog.Debug("seted role for creator", "creator_id", createdChat.CreatedBy, "creator role", creatorRole)
 	// add creator
-	creator := entity.ChatParticipant{
-		ChatID: createdChat.ID,
-		UserID: createdChat.CreatedBy,
-		Role:   creatorRole,
-	}
-	err = s.repository.AddParticipant(creator)
+	err = s.addParticipant(createdChat.ID, createdChat.CreatedBy, creatorRole)
 	if err != nil {
 		err = s.repository.DeleteChat(createdChat.ID)
 		if err != nil {
@@ -138,12 +140,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 			slog.Error("failed parse user_id to uint", "user_id", userID)
 			return nil, errors.New("invalid user_id")
 		}
-		participant := entity.ChatParticipant{
-			ChatID: createdChat.ID,
-			UserID: uint(userId),
-			Role:   memberRole,
-		}
-		err = s.repository.AddParticipant(participant)
+		err = s.addParticipant(createdChat.ID, uint(userId), memberRole)
 		if err != nil {
 			slog.Warn("failed add member", "error", err)
 		}
@@ -297,17 +294,47 @@ func (s *ChatService) AddParticipant(userID string, req request.ParticipantAddRe
 		return errors.New("invalid new_participant_id")
 	}
 
-	participant := entity.ChatParticipant{
-		ChatID: uint(chatId),
-		UserID: uint(newUser),
-		Role:   entity.RoleMember,
-	}
-
-	err = s.repository.AddParticipant(participant)
+	err = s.addParticipant(uint(chatId), uint(newUser), entity.RoleMember)
 	if err != nil {
 		slog.Warn("failed add member", "error", err)
 		return err
 	}
 
 	return nil
+}
+
+func (s *ChatService) addParticipant(chatID, userID uint, role entity.ParticipantRole) error {
+	//check user exist
+	if !s.repository.UserExist(userID) {
+		slog.Warn("user not found", "user_id", userID)
+		return chaterrors.ErrUserNotFound
+	}
+	// check chat exist
+	if !s.repository.ChatExists(chatID) {
+		slog.Warn("chat not found", "chat_id", chatID)
+		return chaterrors.ErrChatNotFound
+	}
+	// check availible for add participant to chat
+	if !s.repository.CheckAvailibleForAddParticipantToChat(chatID) {
+		//directed or full
+		if !s.repository.CheckChatDirected(chatID) {
+			slog.Warn("chat is directed", "chat_id", chatID)
+			return chaterrors.ErrChatIsDirected
+		}
+		slog.Warn("chat is full", "chat_id", chatID)
+		return chaterrors.ErrFullChat
+	}
+	// this user already participant of this chat
+	if s.repository.ParticipantExist(userID, chatID) {
+		slog.Warn("user already participant this chat", "user_id", userID, "chat_id", chatID)
+		return chaterrors.ErrAlreadyParticipant
+	}
+
+	participant := entity.ChatParticipant{
+		UserID: userID,
+		ChatID: chatID,
+		Role:   role,
+	}
+
+	return s.repository.AddParticipant(participant)
 }

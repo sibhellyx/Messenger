@@ -35,10 +35,10 @@ func (r *ChatRepository) CreateChat(chat entity.Chat) (*entity.Chat, error) {
 func (r *ChatRepository) DeleteChat(chatID uint) error {
 	slog.Debug("deleting chat", "chat_id", chatID)
 
-	if !r.chatExists(chatID) {
-		slog.Warn("chat not found", "chat_id", chatID)
-		return chaterrors.ErrChatNotFound
-	}
+	// if !r.chatExists(chatID) {
+	// 	slog.Warn("chat not found", "chat_id", chatID)
+	// 	return chaterrors.ErrChatNotFound
+	// }
 
 	err := r.deleteAllParticipantsFromChat(chatID)
 	if err != nil {
@@ -65,30 +65,6 @@ func (r *ChatRepository) AddParticipant(participant entity.ChatParticipant) erro
 		"user_id", participant.UserID,
 		"role", participant.Role,
 	)
-	if !r.userExist(participant.UserID) {
-		slog.Warn("user not found", "user_id", participant.UserID)
-		return chaterrors.ErrUserNotFound
-	}
-
-	if !r.chatExists(participant.ChatID) {
-		slog.Warn("chat not found", "chat_id", participant.ChatID)
-		return chaterrors.ErrChatNotFound
-	}
-
-	if !r.checkAvailibleForAddParticipantToChat(participant.ChatID) {
-		// check if chat directed
-		if !r.checkChatDirected(participant.ChatID) {
-			slog.Warn("chat is directed", "chat_id", participant.ChatID)
-			return chaterrors.ErrChatIsDirected
-		}
-		slog.Warn("chat is full", "chat_id", participant.ChatID)
-		return chaterrors.ErrFullChat
-	}
-
-	if r.participantExist(participant.UserID, participant.ChatID) {
-		slog.Warn("user already participant this chat", "user_id", participant.UserID, "chat_id", participant.ChatID)
-		return chaterrors.ErrAlreadyParticipant
-	}
 
 	result := r.db.Create(&participant)
 	if result.Error != nil {
@@ -277,25 +253,25 @@ func (r *ChatRepository) FindChatsByName(name string) ([]*entity.Chat, error) {
 	return chats, nil
 }
 
-func (r *ChatRepository) userExist(userID uint) bool {
+func (r *ChatRepository) UserExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)
 	return count > 0
 }
 
-func (r *ChatRepository) participantExist(userID, chatID uint) bool {
+func (r *ChatRepository) ParticipantExist(userID, chatID uint) bool {
 	var count int64
 	r.db.Model(&entity.ChatParticipant{}).Where("user_id = ? AND chat_id = ?", userID, chatID).Count(&count)
 	return count > 0
 }
 
-func (r *ChatRepository) chatExists(chatID uint) bool {
+func (r *ChatRepository) ChatExists(chatID uint) bool {
 	var count int64
 	r.db.Model(&entity.Chat{}).Where("id = ?", chatID).Count(&count)
 	return count > 0
 }
 
-func (r *ChatRepository) checkAvailibleForAddParticipantToChat(chatID uint) bool {
+func (r *ChatRepository) CheckAvailibleForAddParticipantToChat(chatID uint) bool {
 	var maxMembers int
 	r.db.Model(&entity.Chat{}).Where("id = ?", chatID).Select("max_members").Scan(&maxMembers)
 
@@ -306,7 +282,7 @@ func (r *ChatRepository) checkAvailibleForAddParticipantToChat(chatID uint) bool
 	return availibleCount > 0
 }
 
-func (r *ChatRepository) checkChatDirected(chatID uint) bool {
+func (r *ChatRepository) CheckChatDirected(chatID uint) bool {
 	var typeChat entity.ChatType
 
 	r.db.Model(&entity.Chat{}).Where("id = ?", chatID).Select("type").Scan(&typeChat)
