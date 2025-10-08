@@ -232,6 +232,25 @@ func (r *ChatRepository) GetUserChats(userID uint) ([]*entity.Chat, error) {
 	return chats, nil
 }
 
+func (r *ChatRepository)GetChats() ([]*entity.Chat, error){
+	slog.Debug("getting all chats")
+	var chats []*entity.Chat
+
+	err := r.db.
+		Where("deleted_at IS NULL").
+		Find(&chats).Error
+
+	if err != nil {
+		slog.Error("failed to get all chats", "error", err)
+		return nil, chaterrors.ErrFailedGetChats
+	}
+
+	slog.Debug("successfully retrieved all chats",
+		"chat_count", len(chats))
+		
+	return chats, nil
+}
+
 func (r *ChatRepository) userExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)

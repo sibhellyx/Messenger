@@ -21,6 +21,7 @@ type ChatHandlerInterface interface {
 	UpdateChat(c *gin.Context)
 	DeleteChat(c *gin.Context)
 	GetUserChats(c *gin.Context)
+	GetChats(c *gin.Context)
 }
 
 func CreateRoutes(
@@ -44,6 +45,7 @@ func CreateRoutes(
 	r.DELETE("/chat", middleware.AuthMiddleware(m, repo), chatHandler.DeleteChat)
 	r.PUT("/chat", middleware.AuthMiddleware(m, repo), chatHandler.UpdateChat)
 	r.GET("/chats", middleware.AuthMiddleware(m, repo), chatHandler.GetUserChats)
+	r.GET("/chats/all", middleware.AuthMiddleware(m, repo), chatHandler.GetChats)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)

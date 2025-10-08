@@ -28,6 +28,8 @@ type ChatRepositoryInterface interface {
 	UpdateChat(chat *entity.Chat) (*entity.Chat, error)
 	// get chats user
 	GetUserChats(userID uint) ([]*entity.Chat, error)
+	// get all chats
+	GetChats()([]*entity.Chat, error)
 }
 
 type ChatService struct {
@@ -237,4 +239,8 @@ func (s *ChatService) GetChatsUser(userID string) ([]*entity.Chat, error) {
 		return nil, errors.New("invalid user_id")
 	}
 	return s.repository.GetUserChats(uint(id))
+}
+
+func (s *ChatService) GetChats()([]*entity.Chat, error){
+	return s.repository.GetChats()
 }
