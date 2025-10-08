@@ -64,7 +64,12 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	maxMembers := 100
 	if req.Type != "" && req.Type == "direct" {
 		maxMembers = 2
-		chatId, err := s.repository.DirectedChatCreated(uint(id), req.Participants[0].ID)
+		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
+		if err != nil {
+			slog.Error("failed parse user_id to uint", "user_id", userID)
+			return 0, errors.New("invalid user_id")
+		}
+		chatId, err := s.repository.DirectedChatCreated(uint(id), uint(userId))
 		if err != nil {
 			return 0, err
 		}
@@ -95,7 +100,12 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		creatorRole = entity.RoleAdmin
 		memberRole = entity.RoleAdmin
 		// also need check if user want create chat with yourself
-		if req.Participants[0].ID == uint(id) {
+		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
+		if err != nil {
+			slog.Error("failed parse user_id to uint", "user_id", userID)
+			return 0, errors.New("invalid user_id")
+		}
+		if uint(userId) == uint(id) {
 			err = s.repository.DeleteChat(createdChat.ID)
 			if err != nil {
 				return 0, err
@@ -121,9 +131,14 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 
 	// add participant
 	for _, p := range req.Participants {
+		userId, err := strconv.ParseUint(p.ID, 10, 32)
+		if err != nil {
+			slog.Error("failed parse user_id to uint", "user_id", userID)
+			return 0, errors.New("invalid user_id")
+		}
 		participant := entity.ChatParticipant{
 			ChatID: createdChat.ID,
-			UserID: p.ID,
+			UserID: uint(userId),
 			Role:   memberRole,
 		}
 		err = s.repository.AddParticipant(participant)
@@ -154,6 +169,13 @@ func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {
 		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
 		return errors.New("invalid chat_id")
 	}
+
+	_, err = s.repository.GetChatById(uint(chatId))
+	if err != nil {
+		slog.Error("failed get chat", "chat_id", chatId)
+		return errors.New("chat not found")
+	}
+
 	can, err := s.repository.UserCanChange(uint(id), uint(chatId))
 	if err != nil {
 		slog.Error("failed get participant info", "error", err)

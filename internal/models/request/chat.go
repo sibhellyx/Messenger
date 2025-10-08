@@ -47,7 +47,7 @@ func (r ChatRequest) Validate() error {
 }
 
 type Participant struct {
-	ID uint `json:"id"`
+	ID string `json:"id"`
 }
 
 func (r CreateChatRequest) Validate() error {
