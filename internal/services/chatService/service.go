@@ -1,7 +1,6 @@
 package chatservice
 
 import (
-	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -67,7 +66,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return nil, errors.New("invalid user_id")
+		return nil, chaterrors.ErrInvalidUser
 	}
 	time := time.Now()
 
@@ -78,7 +77,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return nil, errors.New("invalid user_id")
+			return nil, chaterrors.ErrInvalidUser
 		}
 
 		chat, err := s.repository.DirectedChatCreated(uint(id), uint(userId))
@@ -116,7 +115,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		userId, err := strconv.ParseUint(req.Participants[0].ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return nil, errors.New("invalid user_id")
+			return nil, chaterrors.ErrInvalidUser
 		}
 		if uint(userId) == uint(id) {
 			err = s.repository.DeleteChat(createdChat.ID)
@@ -142,7 +141,7 @@ func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (
 		userId, err := strconv.ParseUint(p.ID, 10, 32)
 		if err != nil {
 			slog.Error("failed parse user_id to uint", "user_id", userID)
-			return nil, errors.New("invalid user_id")
+			return nil, chaterrors.ErrInvalidUser
 		}
 		err = s.addParticipant(createdChat.ID, uint(userId), memberRole)
 		if err != nil {
@@ -164,19 +163,19 @@ func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return errors.New("invalid user_id")
+		return chaterrors.ErrInvalidUser
 	}
 
 	chatId, err := strconv.ParseUint(req.Id, 10, 32)
 	if err != nil {
 		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
-		return errors.New("invalid chat_id")
+		return chaterrors.ErrInvalidChat
 	}
 
 	_, err = s.repository.GetChatById(uint(chatId))
 	if err != nil {
 		slog.Error("failed get chat", "chat_id", chatId)
-		return errors.New("chat not found")
+		return chaterrors.ErrChatNotFound
 	}
 
 	can, err := s.repository.UserCanChange(uint(id), uint(chatId))
@@ -185,7 +184,7 @@ func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {
 		return err
 	}
 	if !can {
-		return errors.New("participant doesn't have permission to delete this chat")
+		return chaterrors.ErrNotPermission
 	}
 
 	err = s.repository.DeleteChat(uint(chatId))
@@ -210,12 +209,12 @@ func (s *ChatService) UpdateChat(userID string, req request.UpdateChatRequest) (
 	chatId, err := strconv.ParseUint(req.Id, 10, 32)
 	if err != nil {
 		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
-		return nil, errors.New("invalid chat_id")
+		return nil, chaterrors.ErrInvalidChat
 	}
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return nil, errors.New("invalid user_id")
+		return nil, chaterrors.ErrInvalidUser
 	}
 	can, err := s.repository.UserCanChange(uint(id), uint(chatId))
 	if err != nil {
@@ -223,7 +222,7 @@ func (s *ChatService) UpdateChat(userID string, req request.UpdateChatRequest) (
 		return nil, err
 	}
 	if !can {
-		return nil, errors.New("participant doesn't have permission to update this chat")
+		return nil, chaterrors.ErrNotPermission
 	}
 
 	chat, err := s.repository.GetChatById(uint(chatId))
@@ -235,7 +234,7 @@ func (s *ChatService) UpdateChat(userID string, req request.UpdateChatRequest) (
 	// if chat directed not updated data
 	if chat.Type == entity.ChatTypeDirect {
 		slog.Error("cant update direct chat", "chat_id", chatId)
-		return nil, errors.New("failed update chat, direct chat not updated")
+		return nil, chaterrors.ErrCantUpdaeteDirect
 	}
 
 	// update chat from req
@@ -264,7 +263,7 @@ func (s *ChatService) GetChatsUser(userID string) ([]*entity.Chat, error) {
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return nil, errors.New("invalid user_id")
+		return nil, chaterrors.ErrInvalidUser
 	}
 	return s.repository.GetUserChats(uint(id))
 }
@@ -275,7 +274,7 @@ func (s *ChatService) GetChats() ([]*entity.Chat, error) {
 
 func (s *ChatService) SearchChatsByName(name string) ([]*entity.Chat, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, errors.New("invalid searching name")
+		return nil, chaterrors.ErrInvalidNameForSearch
 	}
 
 	return s.repository.FindChatsByName(name)
@@ -289,13 +288,13 @@ func (s *ChatService) AddParticipant(userID string, req request.ParticipantAddRe
 	chatId, err := strconv.ParseUint(req.Id, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", req.Id)
-		return errors.New("invalid chat_id")
+		return chaterrors.ErrInvalidUser
 	}
 
 	newUser, err := strconv.ParseUint(req.NewUserId, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "new_user_id", req.NewUserId)
-		return errors.New("invalid new_participant_id")
+		return chaterrors.ErrInvalidIdNewParticipant
 	}
 
 	err = s.addParticipant(uint(chatId), uint(newUser), entity.RoleMember)

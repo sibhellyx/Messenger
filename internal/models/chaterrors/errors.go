@@ -3,6 +3,7 @@ package chaterrors
 import "errors"
 
 var (
+	// repos layer
 	ErrFailedCreateChat         = errors.New("failed create chat")
 	ErrUserNotFound             = errors.New("user not found")
 	ErrChatNotFound             = errors.New("chat not found")
@@ -18,4 +19,12 @@ var (
 	ErrFailedUpdateChat         = errors.New("failed to update chat")
 	ErrFailedGetParticipant     = errors.New("failed get participant")
 	ErrFailedGetChats           = errors.New("failed get chats")
+
+	// service layer
+	ErrInvalidUser             = errors.New("invalid user_id")
+	ErrInvalidChat             = errors.New("invalid chat_id")
+	ErrNotPermission           = errors.New("participant doesn't have permission")
+	ErrCantUpdaeteDirect       = errors.New("failed update chat, direct chat not updated")
+	ErrInvalidNameForSearch    = errors.New("invalid searching name")
+	ErrInvalidIdNewParticipant = errors.New("invalid new_participant_id")
 )
