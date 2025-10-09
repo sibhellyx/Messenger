@@ -26,8 +26,8 @@ type ChatParticipant struct {
 	NotificationsEnabled bool            `gorm:"default:true" json:"notificationsEnabled"`
 
 	// GORM relationships
-	Chat            Chat     `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
-	User            User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Chat            *Chat    `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
+	User            *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	LastReadMessage *Message `gorm:"foreignKey:LastReadMessageID" json:"lastReadMessage,omitempty"`
 }
 

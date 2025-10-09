@@ -253,6 +253,28 @@ func (r *ChatRepository) FindChatsByName(name string) ([]*entity.Chat, error) {
 	return chats, nil
 }
 
+func (r *ChatRepository) GetChatParticipants(chatID uint) ([]*entity.ChatParticipant, error) {
+	slog.Debug("getting chat participants", "chat_id", chatID)
+
+	var participants []*entity.ChatParticipant
+
+	err := r.db.
+		Where("chat_id = ? AND deleted_at IS NULL", chatID).
+		Find(&participants).Error
+
+	if err != nil {
+		slog.Error("failed to get chat participants",
+			"chat_id", chatID,
+			"error", err)
+		return nil, chaterrors.ErrFailedGetParticipants
+	}
+
+	slog.Debug("successfully retrieved chat participants",
+		"chat_id", chatID,
+		"participant_count", len(participants))
+	return participants, nil
+}
+
 func (r *ChatRepository) UserExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)

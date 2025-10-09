@@ -32,6 +32,8 @@ type ChatRepositoryInterface interface {
 	GetChats() ([]*entity.Chat, error)
 	// geting chats by name searching
 	FindChatsByName(name string) ([]*entity.Chat, error)
+	// getting chat participants
+	GetChatParticipants(chatID uint) ([]*entity.ChatParticipant, error)
 
 	// check chat exist
 	ChatExists(chatID uint) bool
@@ -284,11 +286,10 @@ func (s *ChatService) AddParticipant(userID string, req request.ParticipantAddRe
 	slog.Debug("add participant to chat", "chat_id", req.Id, "adder_id", userID, "new_participant", req.Id)
 
 	// add Validate
-
 	chatId, err := strconv.ParseUint(req.Id, 10, 32)
 	if err != nil {
-		slog.Error("failed parse user_id to uint", "user_id", req.Id)
-		return chaterrors.ErrInvalidUser
+		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
+		return chaterrors.ErrInvalidChat
 	}
 
 	newUser, err := strconv.ParseUint(req.NewUserId, 10, 32)
@@ -340,4 +341,20 @@ func (s *ChatService) addParticipant(chatID, userID uint, role entity.Participan
 	}
 
 	return s.repository.AddParticipant(participant)
+}
+
+func (s *ChatService) GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error) {
+	slog.Debug("getting chat participants", "chat_id", chatID)
+	chatId, err := strconv.ParseUint(chatID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "chat_id", chatID)
+		return nil, chaterrors.ErrInvalidChat
+	}
+	participants, err := s.repository.GetChatParticipants(uint(chatId))
+	if err != nil {
+		return nil, chaterrors.ErrFailedGetParticipants
+	}
+
+	slog.Debug("participants sucsessfuly get from chat", "chat_id", chatId, "count participants", len(participants))
+	return participants, nil
 }

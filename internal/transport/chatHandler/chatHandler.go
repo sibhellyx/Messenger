@@ -18,6 +18,7 @@ type ChatServiceInterface interface {
 	GetChats() ([]*entity.Chat, error)
 	SearchChatsByName(name string) ([]*entity.Chat, error)
 	AddParticipant(userID string, req request.ParticipantAddRequest) error
+	GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error)
 }
 
 type ChatHandler struct {
@@ -195,6 +196,28 @@ func (h *ChatHandler) LeaveChat(c *gin.Context) {
 
 // get members of chat
 func (h *ChatHandler) GetChatParticipants(c *gin.Context) {
+	chatID := c.Query("id")
+
+	if chatID == "" {
+		WrapError(c, errors.New("id of chat required"))
+		return
+	}
+
+	if len(chatID) > 10 {
+		WrapError(c, errors.New("id of chat too long"))
+		return
+	}
+
+	particpants, err := h.service.GetChatParticipants(chatID)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"participants": particpants,
+		"count":        len(particpants),
+	})
 
 }
 

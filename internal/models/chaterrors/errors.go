@@ -27,4 +27,5 @@ var (
 	ErrCantUpdaeteDirect       = errors.New("failed update chat, direct chat not updated")
 	ErrInvalidNameForSearch    = errors.New("invalid searching name")
 	ErrInvalidIdNewParticipant = errors.New("invalid new_participant_id")
+	ErrFailedGetParticipants   = errors.New("failed get chat participants")
 )

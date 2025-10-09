@@ -24,6 +24,7 @@ type ChatHandlerInterface interface {
 	GetChats(c *gin.Context)
 	FindChats(c *gin.Context)
 	AddParticipant(c *gin.Context)
+	GetChatParticipants(c *gin.Context)
 }
 
 func CreateRoutes(
@@ -51,6 +52,7 @@ func CreateRoutes(
 	r.GET("/chats/search", middleware.AuthMiddleware(m, repo), chatHandler.FindChats)
 	// participants endpoints
 	r.POST("/chat/add", middleware.AuthMiddleware(m, repo), chatHandler.AddParticipant)
+	r.GET("/chat/participants", middleware.AuthMiddleware(m, repo), chatHandler.GetChatParticipants)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)
