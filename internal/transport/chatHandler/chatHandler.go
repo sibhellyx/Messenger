@@ -17,7 +17,8 @@ type ChatServiceInterface interface {
 	GetChatsUser(userID string) ([]*entity.Chat, error)
 	GetChats() ([]*entity.Chat, error)
 	SearchChatsByName(name string) ([]*entity.Chat, error)
-	AddParticipant(userID string, req request.ParticipantAddRequest) error
+	AddParticipant(userID string, req request.ParticipantRequest) error
+	RemoveParticipant(userID string, req request.ParticipantRequest) error
 	GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error)
 	LeaveFromChat(chatID string, userID string) error
 }
@@ -249,7 +250,7 @@ func (h *ChatHandler) AddParticipant(c *gin.Context) {
 		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
-	var req request.ParticipantAddRequest
+	var req request.ParticipantRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&req)
 	if err != nil {
 		WrapError(c, err)
@@ -269,7 +270,29 @@ func (h *ChatHandler) AddParticipant(c *gin.Context) {
 
 // remove member from chat
 func (h *ChatHandler) RemoveParticipant(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ParticipantRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	err = h.service.RemoveParticipant(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"result":          "removed from chat",
+		"chat_id":         req.Id,
+		"deleted_user_id": req.UserId,
+	})
 }
 
 // update role of member chat
