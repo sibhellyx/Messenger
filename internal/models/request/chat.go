@@ -52,6 +52,11 @@ type Participant struct {
 
 func (r CreateChatRequest) Validate() error {
 	slog.Debug("validating creating chat input")
+
+	err := r.Type.Validate()
+	if err != nil {
+		return err
+	}
 	// if directed chat
 	if r.Type == entity.ChatTypeDirect {
 		if len(r.Participants) != 1 {

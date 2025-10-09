@@ -15,6 +15,15 @@ const (
 	ChatTypeChannel ChatType = "channel"
 )
 
+func (c ChatType) Validate() error {
+	switch c {
+	case ChatTypeChannel, ChatTypeDirect, ChatTypeGroup, "":
+		return nil
+	default:
+		return errors.New("not valid type of chat")
+	}
+}
+
 type Chat struct {
 	gorm.Model
 	Name           string     `gorm:"size:255;not null" json:"name"`
