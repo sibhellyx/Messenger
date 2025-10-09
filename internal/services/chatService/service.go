@@ -350,6 +350,12 @@ func (s *ChatService) GetChatParticipants(chatID string) ([]*entity.ChatParticip
 		slog.Error("failed parse chat_id to uint", "chat_id", chatID)
 		return nil, chaterrors.ErrInvalidChat
 	}
+
+	if !s.repository.ChatExists(uint(chatId)) {
+		slog.Warn("chat not found", "chat_id", chatId)
+		return nil, chaterrors.ErrChatNotFound
+	}
+
 	participants, err := s.repository.GetChatParticipants(uint(chatId))
 	if err != nil {
 		return nil, chaterrors.ErrFailedGetParticipants
