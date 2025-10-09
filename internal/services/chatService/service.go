@@ -34,11 +34,15 @@ type ChatRepositoryInterface interface {
 	// geting chats by name searching
 	FindChatsByName(name string) ([]*entity.Chat, error)
 
-	// some functions for checking
+	// check chat exist
 	ChatExists(chatID uint) bool
+	// check chat for fulling
 	CheckAvailibleForAddParticipantToChat(chatID uint) bool
+	// check if chat directed
 	CheckChatDirected(chatID uint) bool
+	// check user for participant
 	ParticipantExist(userID, chatID uint) bool
+	// check user for exist
 	UserExist(userID uint) bool
 }
 
