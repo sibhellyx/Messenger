@@ -308,6 +308,26 @@ func (r *ChatRepository) GetParticipantByUserIdAndChatId(userID, chatID uint) (*
 	return &participant, nil
 }
 
+func (r *ChatRepository) UpdateParticipant(participant *entity.ChatParticipant) error {
+	slog.Debug("updating participant", "chat_id", participant.ChatID, "user_id", participant.UserID)
+
+	result := r.db.Save(participant)
+	if result.Error != nil {
+		slog.Error("failed to update participant",
+			"chat_id", participant.ChatID,
+			"user_id", participant.UserID,
+			"error", result.Error)
+		return chaterrors.ErrFailedUpdateParticipant
+	}
+
+	slog.Info("participant updated successfully",
+		"chat_id", participant.ChatID,
+		"user_id", participant.UserID,
+		"role", participant.Role,
+	)
+	return nil
+}
+
 func (r *ChatRepository) UserExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)

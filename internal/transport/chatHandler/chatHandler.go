@@ -19,6 +19,7 @@ type ChatServiceInterface interface {
 	SearchChatsByName(name string) ([]*entity.Chat, error)
 	AddParticipant(userID string, req request.ParticipantRequest) error
 	RemoveParticipant(userID string, req request.ParticipantRequest) error
+	UpdateParticipant(userID string, req request.ParticipantUpdateRequest) error
 	GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error)
 	LeaveFromChat(chatID string, userID string) error
 }
@@ -264,7 +265,7 @@ func (h *ChatHandler) AddParticipant(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": req.Id,
+		"user_id": req.UserId,
 	})
 }
 
@@ -296,8 +297,28 @@ func (h *ChatHandler) RemoveParticipant(c *gin.Context) {
 }
 
 // update role of member chat
-func (h *ChatHandler) UpdateParticipantRole(c *gin.Context) {
+func (h *ChatHandler) UpdateParticipant(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ParticipantUpdateRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	err = h.service.UpdateParticipant(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"result": "user role updated",
+	})
 }
 
 func WrapError(c *gin.Context, err error) {

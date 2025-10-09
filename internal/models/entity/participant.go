@@ -35,35 +35,13 @@ func (ChatParticipant) TableName() string {
 	return "chat_participants"
 }
 
-func (cp ChatParticipant) Validate() error {
-	if cp.ChatID == 0 {
-		return errors.New("chatId is required")
-	}
-
-	if cp.UserID == 0 {
-		return errors.New("userId is required")
-	}
-
-	if !cp.isValidRole() {
-		return errors.New("invalid participant role")
-	}
-
-	return nil
-}
-
-func (cp ChatParticipant) isValidRole() bool {
-	switch cp.Role {
-	case RoleOwner, RoleAdmin, RoleMember:
-		return true
+func GetRoleForUpdate(s string) (ParticipantRole, error) {
+	switch s {
+	case "admin":
+		return RoleAdmin, nil
+	case "member":
+		return RoleMember, nil
 	default:
-		return false
+		return "", errors.New("incorrect role for update")
 	}
-}
-
-func (cp ChatParticipant) CanModifyChat() bool {
-	return cp.Role == RoleOwner || cp.Role == RoleAdmin
-}
-
-func (cp ChatParticipant) CanInviteUsers() bool {
-	return cp.Role == RoleOwner || cp.Role == RoleAdmin
 }

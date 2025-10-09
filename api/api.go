@@ -27,6 +27,7 @@ type ChatHandlerInterface interface {
 	GetChatParticipants(c *gin.Context)
 	LeaveChat(c *gin.Context)
 	RemoveParticipant(c *gin.Context)
+	UpdateParticipant(c *gin.Context)
 }
 
 func CreateRoutes(
@@ -57,6 +58,7 @@ func CreateRoutes(
 	r.GET("/chat/participants", middleware.AuthMiddleware(m, repo), chatHandler.GetChatParticipants)
 	r.POST("/chat/leave", middleware.AuthMiddleware(m, repo), chatHandler.LeaveChat)
 	r.DELETE("/chat/remove", middleware.AuthMiddleware(m, repo), chatHandler.RemoveParticipant)
+	r.PUT("/chat/participant", middleware.AuthMiddleware(m, repo), chatHandler.UpdateParticipant)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)

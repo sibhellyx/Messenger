@@ -38,6 +38,8 @@ type ChatRepositoryInterface interface {
 	DeleteFromChat(chatID, userID uint) error
 	// get participant by chat_id and user_id
 	GetParticipantByUserIdAndChatId(userID, chatID uint) (*entity.ChatParticipant, error)
+	// update participant
+	UpdateParticipant(participant *entity.ChatParticipant) error
 
 	// check chat exist
 	ChatExists(chatID uint) bool
@@ -371,13 +373,12 @@ func (s *ChatService) RemoveParticipant(userID string, req request.ParticipantRe
 	}
 	if user.Role == entity.RoleMember {
 		slog.Error("failed remove user from chat, member can't remove another users", "chat_id", req.Id, "user_id", userID, "participant_id(for delete)", req.UserId)
-		return chaterrors.ErrFailedRemoveParticipantByMember
+		return chaterrors.ErrNotPermission
 	}
 	if user.Role == entity.RoleAdmin && (userForRemove.Role == entity.RoleAdmin || userForRemove.Role == entity.RoleOwner) {
 		slog.Error("failed remove user from chat, admin can't remove another admins or owner", "chat_id", req.Id, "user_id", userID, "participant_id(for delete)", req.UserId)
 		return chaterrors.ErrFailedRemoveAdminOrOwnerByAdmin
 	}
-	slog.Debug("user sucsessfuly removed from chat", "chat_id", chatId, "user_id", userId, "participant_id(for delete)", participantId)
 	return s.repository.DeleteFromChat(uint(chatId), uint(participantId))
 }
 
@@ -479,4 +480,69 @@ func (s *ChatService) LeaveFromChat(chatID string, userID string) error {
 	slog.Debug("user sucsessfuly leaved from chat", "chat_id", chatID, "user_id", userID)
 
 	return s.repository.DeleteFromChat(uint(chatId), uint(userId))
+}
+
+func (s *ChatService) UpdateParticipant(userID string, req request.ParticipantUpdateRequest) error {
+	slog.Debug("update participant", "chat_id", req.Id, "by user_id", userID, "to user_id", req.UserId, "role", req.Role)
+	err := req.Validate()
+	if err != nil {
+		slog.Error("failed validate request", "error", err)
+		return err
+	}
+
+	role, err := entity.GetRoleForUpdate(req.Role)
+	if err != nil {
+		slog.Error("failed get role for update", "role from req", req.Role)
+		return err
+	}
+
+	chatId, err := strconv.ParseUint(req.Id, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
+		return chaterrors.ErrInvalidChat
+	}
+
+	userId, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", userID)
+		return chaterrors.ErrInvalidUser
+	}
+
+	participantId, err := strconv.ParseUint(req.UserId, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id(participant for delete) to uint", "new_user_id", req.UserId)
+		return chaterrors.ErrInvalidUser
+	}
+
+	if !s.repository.UserExist(uint(userId)) {
+		slog.Warn("user not found", "user_id", userID)
+		return chaterrors.ErrUserNotFound
+	}
+	if !s.repository.UserExist(uint(participantId)) {
+		slog.Warn("user(participant for delete) not found", "user_id", userID)
+		return chaterrors.ErrUserNotFound
+	}
+	if !s.repository.ChatExists(uint(chatId)) {
+		slog.Warn("chat not found", "chat_id", chatId)
+		return chaterrors.ErrChatNotFound
+	}
+
+	user, err := s.repository.GetParticipantByUserIdAndChatId(uint(userId), uint(chatId))
+	if err != nil {
+		slog.Error("failed get participant(who want update) info", "error", err)
+		return err
+	}
+
+	if user.Role == entity.RoleMember || user.Role == entity.RoleAdmin {
+		slog.Error("failed update user from chat, member or admin can't update another users", "chat_id", req.Id, "user_id", userID, "participant_id(for update)", req.UserId)
+		return chaterrors.ErrNotPermission
+	}
+
+	userUpdate, err := s.repository.GetParticipantByUserIdAndChatId(uint(participantId), uint(chatId))
+	if err != nil {
+		slog.Error("failed get participant(who will update) info", "error", err)
+		return err
+	}
+	userUpdate.Role = role
+	return s.repository.UpdateParticipant(userUpdate)
 }

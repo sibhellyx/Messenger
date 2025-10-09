@@ -25,6 +25,7 @@ var (
 	ErrFailedLeaveDirectedChat         = errors.New("failed leave from directed chat, delete chat")
 	ErrFailedRemoveParticipantByMember = errors.New("failed remove user, member can't remove participants")
 	ErrFailedRemoveAdminOrOwnerByAdmin = errors.New("failed remove user, admin can't remove another admins or owner")
+	ErrFailedUpdateParticipant         = errors.New("failed update participant")
 
 	// service layer
 	ErrInvalidUser             = errors.New("invalid user_id")
