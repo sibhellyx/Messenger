@@ -34,6 +34,8 @@ type ChatRepositoryInterface interface {
 	FindChatsByName(name string) ([]*entity.Chat, error)
 	// getting chat participants
 	GetChatParticipants(chatID uint) ([]*entity.ChatParticipant, error)
+	// delete user from chat
+	DeleteFromChat(chatID, userID uint) error
 
 	// check chat exist
 	ChatExists(chatID uint) bool
@@ -43,6 +45,8 @@ type ChatRepositoryInterface interface {
 	CheckChatDirected(chatID uint) bool
 	// check user for participant
 	ParticipantExist(userID, chatID uint) bool
+	// check participant to owner chat
+	ParticipantIsOwner(userID, chatID uint) bool
 	// check user for exist
 	UserExist(userID uint) bool
 }
@@ -363,4 +367,46 @@ func (s *ChatService) GetChatParticipants(chatID string) ([]*entity.ChatParticip
 
 	slog.Debug("participants sucsessfuly get from chat", "chat_id", chatId, "count participants", len(participants))
 	return participants, nil
+}
+
+func (s *ChatService) LeaveFromChat(chatID string, userID string) error {
+	slog.Debug("user leave chat", "chat_id", chatID, "user_id", userID)
+	chatId, err := strconv.ParseUint(chatID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "chat_id", chatID)
+		return chaterrors.ErrInvalidChat
+	}
+	userId, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", userID)
+		return chaterrors.ErrInvalidUser
+	}
+
+	if !s.repository.ChatExists(uint(chatId)) {
+		slog.Warn("chat not found", "chat_id", chatId)
+		return chaterrors.ErrChatNotFound
+	}
+
+	if !s.repository.UserExist(uint(userId)) {
+		slog.Warn("user not found", "user_id", userID)
+		return chaterrors.ErrUserNotFound
+	}
+	// check if user not participant
+	if !s.repository.ParticipantExist(uint(userId), uint(chatId)) {
+		slog.Warn("user not participant this chat", "user_id", userID, "chat_id", chatID)
+		return chaterrors.ErrNotParticipant
+	}
+	// check role to owner
+	if s.repository.ParticipantIsOwner(uint(userId), uint(chatId)) {
+		slog.Warn("user is owner this chat", "user_id", userID, "chat_id", chatID)
+		return chaterrors.ErrUserIsOwner
+	}
+	//
+	if !s.repository.CheckChatDirected(uint(chatId)) {
+		slog.Warn("chat is directed, can't leave from directed chat", "chat_id", chatID)
+		return chaterrors.ErrFailedLeaveDirectedChat
+	}
+	slog.Debug("user sucsessfuly leaved from chat", "chat_id", chatID, "user_id", userID)
+
+	return s.repository.DeleteFromChat(uint(chatId), uint(userId))
 }

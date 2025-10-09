@@ -19,6 +19,7 @@ type ChatServiceInterface interface {
 	SearchChatsByName(name string) ([]*entity.Chat, error)
 	AddParticipant(userID string, req request.ParticipantAddRequest) error
 	GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error)
+	LeaveFromChat(chatID string, userID string) error
 }
 
 type ChatHandler struct {
@@ -191,7 +192,27 @@ func (h *ChatHandler) FindChats(c *gin.Context) {
 
 // leave from chat
 func (h *ChatHandler) LeaveChat(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ChatRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
+	err = h.service.LeaveFromChat(req.Id, userId.(string))
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"result": "leaved from chat",
+	})
 }
 
 // get members of chat

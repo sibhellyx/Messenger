@@ -35,11 +35,6 @@ func (r *ChatRepository) CreateChat(chat entity.Chat) (*entity.Chat, error) {
 func (r *ChatRepository) DeleteChat(chatID uint) error {
 	slog.Debug("deleting chat", "chat_id", chatID)
 
-	// if !r.chatExists(chatID) {
-	// 	slog.Warn("chat not found", "chat_id", chatID)
-	// 	return chaterrors.ErrChatNotFound
-	// }
-
 	err := r.deleteAllParticipantsFromChat(chatID)
 	if err != nil {
 		return err
@@ -275,6 +270,22 @@ func (r *ChatRepository) GetChatParticipants(chatID uint) ([]*entity.ChatPartici
 	return participants, nil
 }
 
+func (r *ChatRepository) DeleteFromChat(chatID, userID uint) error {
+	slog.Debug("deleting user from chat", "user_id", userID, "chat_id", chatID)
+
+	err := r.db.Where("chat_id = ? AND user_id = ?", chatID, userID).Delete(&entity.ChatParticipant{}).Error
+	if err != nil {
+		slog.Error("failed to delete chat participants",
+			"chat_id", chatID,
+			"user_id", userID,
+			"error", err)
+		return chaterrors.ErrFailedDeleteParticipant
+	}
+
+	slog.Debug("succsessfuly comleted deleting user from chat", "user_id", userID, "chat_id", chatID)
+	return nil
+}
+
 func (r *ChatRepository) UserExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)
@@ -284,6 +295,26 @@ func (r *ChatRepository) UserExist(userID uint) bool {
 func (r *ChatRepository) ParticipantExist(userID, chatID uint) bool {
 	var count int64
 	r.db.Model(&entity.ChatParticipant{}).Where("user_id = ? AND chat_id = ?", userID, chatID).Count(&count)
+	return count > 0
+}
+
+func (r *ChatRepository) ParticipantIsOwner(userID, chatID uint) bool {
+	var count int64
+	err := r.db.Model(&entity.ChatParticipant{}).
+		Where("user_id = ?", userID).
+		Where("chat_id = ?", chatID).
+		Where("role = ?", entity.RoleOwner).
+		Where("deleted_at IS NULL").
+		Count(&count).Error
+
+	if err != nil {
+		slog.Error("failed to check if participant is owner",
+			"user_id", userID,
+			"chat_id", chatID,
+			"error", err)
+		return false
+	}
+
 	return count > 0
 }
 
