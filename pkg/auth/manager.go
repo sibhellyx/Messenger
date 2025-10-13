@@ -7,71 +7,98 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sibhellyx/Messenger/internal/models/payload"
 )
 
 type Manager struct {
-	signingKey string
+	signingKey []byte
 }
 
-func NewManager(singingKey string) *Manager {
+func NewManager(signingKey string) *Manager {
 	return &Manager{
-		signingKey: singingKey,
+		signingKey: []byte(signingKey),
 	}
 }
 
-func (m *Manager) NewJWT(payload payload.JwtPayload, ttl time.Duration) (string, error) {
+func (m *Manager) NewJWT(p payload.JwtPayload, ttl time.Duration) (string, error) {
 	slog.Debug("creating jwt")
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{
-		ExpiresAt: time.Now().Add(ttl).Unix(),
-		Subject:   payload.UserId,
-		Id:        payload.Uuid,
-	})
-	return token.SignedString([]byte(m.signingKey))
+
+	claims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		NotBefore: jwt.NewNumericDate(time.Now()),
+		Subject:   p.UserId,
+		ID:        p.Uuid,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+
+	tokenString, err := token.SignedString(m.signingKey)
+	if err != nil {
+		slog.Error("failed to sign JWT token", "error", err)
+		return "", err
+	}
+
+	slog.Debug("JWT token created successfully")
+	return tokenString, nil
 }
 
 func (m *Manager) Parse(accessToken string) (payload.JwtPayload, error) {
-	slog.Debug("parse jwt")
-	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (i interface{}, err error) {
+	slog.Debug("parsing JWT token")
+
+	token, err := jwt.ParseWithClaims(accessToken, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			errMsg := "unexpected signing method"
-			slog.Error("jwt parsing failed",
+			slog.Error("JWT parsing failed",
 				"error", errMsg,
-				"algorithm", token.Header["alg"])
+				"algorithm", token.Method.Alg())
 			return nil, errors.New(errMsg)
 		}
-		return []byte(m.signingKey), nil
+		return m.signingKey, nil
 	})
+
 	if err != nil {
-		slog.Error("jwt parsing failed", "error", err)
+		slog.Error("JWT parsing failed", "error", err)
 		return payload.JwtPayload{}, err
 	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		errMsg := "error get user from token"
-		slog.Error("jwt parsing failed", "error", errMsg)
+
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok || !token.Valid {
+		errMsg := "invalid token claims"
+		slog.Error("JWT parsing failed", "error", errMsg)
 		return payload.JwtPayload{}, errors.New(errMsg)
 	}
 
-	payload := payload.JwtPayload{
-		UserId: claims["sub"].(string),
-		Uuid:   claims["jti"].(string),
+	if time.Now().After(claims.ExpiresAt.Time) {
+		errMsg := "token expired"
+		slog.Error("JWT parsing failed", "error", errMsg)
+		return payload.JwtPayload{}, errors.New(errMsg)
 	}
 
-	slog.Debug("parsed jwt", "payload", payload)
+	result := payload.JwtPayload{
+		UserId: claims.Subject,
+		Uuid:   claims.ID,
+	}
 
-	return payload, nil
+	slog.Debug("JWT token parsed successfully",
+		"user_id", result.UserId,
+		"uuid", result.Uuid,
+	)
+
+	return result, nil
 }
 
 func (m *Manager) NewRefreshToken() (string, error) {
-	slog.Debug("generate refresh token")
-	b := make([]byte, 32)
+	slog.Debug("generating refresh token")
 
+	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		slog.Error("failed to generate refresh token", "error", err)
 		return "", err
 	}
 
-	return hex.EncodeToString(b), nil
+	token := hex.EncodeToString(b)
+	slog.Debug("refresh token generated successfully")
+	return token, nil
 }
