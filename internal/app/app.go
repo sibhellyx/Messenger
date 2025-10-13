@@ -49,6 +49,9 @@ func (srv *Server) Serve() {
 	slog.Debug("loading configs for websockets")
 	wsConfs := config.LoadWsConfig()
 
+	slog.Debug("loading configs for auth")
+	authConfs := config.LoadEnvAuthConfig()
+
 	// start database
 	slog.Debug("connecting to database")
 	database, err := gorm.Open(postgres.New(postgres.Config{
@@ -76,9 +79,9 @@ func (srv *Server) Serve() {
 
 	//init hasher and manager
 	slog.Debug("init hasher for passwords")
-	hasher := hash.NewHasher("salt")
+	hasher := hash.NewHasher(authConfs.Salt)
 	slog.Debug("init manager for auth")
-	manager := auth.NewManager("some-auth-manager")
+	manager := auth.NewManager(authConfs.SigningKey)
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")

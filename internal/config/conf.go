@@ -43,6 +43,11 @@ type Config struct {
 	RefreshTTL int `mapstructure:"REFRESH_TTL"`
 	//for sessions
 	ActiveSessions int `mapstructure:"ACTIVE_SESSIONS"`
+
+	// salt for hash
+	Salt string `mapstructure:"SALT"`
+	// signing key for auth manager
+	SigningKey string `mapstructure:"SIGNING_KEY"`
 }
 
 func LoadConfig() Config {
