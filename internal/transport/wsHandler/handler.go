@@ -1,21 +1,22 @@
 package wshandler
 
 import (
-	"log/slog"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/sibhellyx/Messenger/internal/ws"
 )
 
+type WsServiceInterface interface {
+	HandleConnection(userID, uuid string, conn *websocket.Conn, userAgent, ipAddress string) error
+}
+
 type WsHandler struct {
-	hub      *ws.Hub
+	service  WsServiceInterface
 	upgrader websocket.Upgrader
 }
 
-func NewWsHandler(hub *ws.Hub) *WsHandler {
+func NewWsHandler(service WsServiceInterface) *WsHandler {
 	return &WsHandler{
-		hub: hub,
+		service: service,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -41,23 +42,12 @@ func (h *WsHandler) Connect(c *gin.Context) {
 		return
 	}
 
-	client := ws.NewClient(
+	h.service.HandleConnection(
 		userId.(string),
 		uuid.(string),
 		conn,
 		c.Request.UserAgent(),
 		c.ClientIP(),
-		h.hub,
 	)
-
-	h.hub.Register <- client
-
-	go client.WritePump()
-	go client.ReadPump()
-
-	slog.Info("New client connected",
-		"user_id", client.ID,
-		"uuid", client.UUID,
-		"total_clients", len(h.hub.Clients))
 
 }

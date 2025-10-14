@@ -14,6 +14,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
+	wsservice "github.com/sibhellyx/Messenger/internal/services/wsService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
 	chathandler "github.com/sibhellyx/Messenger/internal/transport/chatHandler"
 	wshandler "github.com/sibhellyx/Messenger/internal/transport/wsHandler"
@@ -94,13 +95,15 @@ func (srv *Server) Serve() {
 	)
 	slog.Debug("connecting to chat service")
 	chatService := chatservice.NewChatService(chatRepository)
+	slog.Debug("connecting to ws service")
+	wsService := wsservice.NewWsService(hub)
 	// init Handlers
 	slog.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)
 	slog.Debug("connecting to chat handler")
 	chatHandler := chathandler.NewChatHandler(chatService)
 	slog.Debug("connecting to ws handler")
-	wsHandler := wshandler.NewWsHandler(hub)
+	wsHandler := wshandler.NewWsHandler(wsService)
 
 	//init routes for messanger
 	slog.Debug("creating routes")
