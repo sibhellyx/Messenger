@@ -43,14 +43,7 @@ func NewServer(ctx context.Context, cfg config.Config, logger *slog.Logger) *Ser
 }
 
 func (srv *Server) Serve() {
-	slog.Info("starting server", "port", srv.cfg.Port)
-
-	// load config for web sockets
-	slog.Debug("loading configs for websockets")
-	wsConfs := config.LoadWsConfig()
-
-	slog.Debug("loading configs for auth")
-	authConfs := config.LoadEnvAuthConfig()
+	slog.Info("starting server", "port", srv.cfg.Srv.Port)
 
 	// start database
 	slog.Debug("connecting to database")
@@ -74,14 +67,14 @@ func (srv *Server) Serve() {
 
 	// init and start hub for chat
 	slog.Debug("connect and start hub")
-	hub := ws.NewHub(wsConfs)
+	hub := ws.NewHub(srv.cfg.Ws)
 	go hub.Run()
 
 	//init hasher and manager
 	slog.Debug("init hasher for passwords")
-	hasher := hash.NewHasher(authConfs.Salt)
+	hasher := hash.NewHasher(srv.cfg.Auth.Salt)
 	slog.Debug("init manager for auth")
-	manager := auth.NewManager(authConfs.SigningKey)
+	manager := auth.NewManager(srv.cfg.Auth.SigningKey)
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")
@@ -95,9 +88,9 @@ func (srv *Server) Serve() {
 		authRepository,
 		hasher,
 		manager,
-		time.Duration(srv.cfg.AccessTTL*int(time.Minute)),
-		time.Duration(srv.cfg.RefreshTTL*int(time.Hour*24)),
-		srv.cfg.ActiveSessions,
+		time.Duration(srv.cfg.Jwt.AccessTTL*int(time.Minute)),
+		time.Duration(srv.cfg.Jwt.RefreshTTL*int(time.Hour*24)),
+		srv.cfg.Jwt.ActiveSessions,
 	)
 	slog.Debug("connecting to chat service")
 	chatService := chatservice.NewChatService(chatRepository)
@@ -116,12 +109,12 @@ func (srv *Server) Serve() {
 	// create http server
 	slog.Debug("init server")
 	srv.srv = &http.Server{
-		Addr:    ":" + srv.cfg.Port,
+		Addr:    ":" + srv.cfg.Srv.Port,
 		Handler: routes,
 	}
 
 	// start server
-	slog.Info("starting HTTP server", "port", srv.cfg.Port)
+	slog.Info("starting HTTP server", "port", srv.cfg.Srv.Port)
 	if err := srv.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("HTTP server error - shutting down", "error", err)
 		os.Exit(1)

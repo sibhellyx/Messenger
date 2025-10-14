@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -14,17 +13,15 @@ import (
 )
 
 func main() {
-	// load enviroment for logger
-	envConfig, err := config.LoadEnvConfig()
+	// init cfg
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load configuration", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	// init logger
-	logger := logger.NewLogger(envConfig.Environment)
+	logger := logger.NewLogger(cfg.Env.Environment)
 	slog.SetDefault(logger)
-
-	// init cfg
-	cfg := config.LoadConfig()
 	// init context with cancel
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -40,5 +37,4 @@ func main() {
 	}()
 
 	server.Serve()
-
 }
