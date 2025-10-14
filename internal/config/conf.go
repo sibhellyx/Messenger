@@ -41,13 +41,39 @@ type WsConfig struct {
 	MaxMessageSize int64         `mapstructure:"MAX_MESSAGE_SIZE"` // max size message
 }
 
+type KafkaConfig struct {
+	Brokers       []string `mapstructure:"KAFKA_BROKERS"`        // Kafka brokers
+	TopicMessages string   `mapstructure:"KAFKA_TOPIC_MESSAGES"` // topic for messages
+	TopicDLQ      string   `mapstructure:"KAFKA_TOPIC_DLQ"`      // topic for dead letter queue
+	GroupID       string   `mapstructure:"KAFKA_GROUP_ID"`       // consumer group ID
+
+	// Producer settings
+	MaxRetry        int    `mapstructure:"KAFKA_MAX_RETRY"`        // max retry attempts
+	BatchSize       int    `mapstructure:"KAFKA_BATCH_SIZE"`       // batch size for producer
+	LingerMS        int    `mapstructure:"KAFKA_LINGER_MS"`        // linger milliseconds
+	RequiredAcks    int    `mapstructure:"KAFKA_REQUIRED_ACKS"`    // required acknowledgments
+	CompressionType string `mapstructure:"KAFKA_COMPRESSION_TYPE"` // compression type
+
+	// Consumer settings
+	SessionTimeout  int    `mapstructure:"KAFKA_SESSION_TIMEOUT"`   // session timeout in seconds
+	AutoOffsetReset string `mapstructure:"KAFKA_AUTO_OFFSET_RESET"` // auto offset reset policy
+	MinBytes        int    `mapstructure:"KAFKA_MIN_BYTES"`         // min bytes to fetch
+	MaxBytes        int    `mapstructure:"KAFKA_MAX_BYTES"`         // max bytes to fetch
+	MaxWaitTime     int    `mapstructure:"KAFKA_MAX_WAIT_TIME"`     // max wait time in ms
+
+	// Timeouts
+	WriteTimeout int `mapstructure:"KAFKA_WRITE_TIMEOUT"` // write timeout in seconds
+	ReadTimeout  int `mapstructure:"KAFKA_READ_TIMEOUT"`  // read timeout in seconds
+}
+
 type Config struct {
-	Env  EnvConfig
-	Srv  ServerConfig
-	Db   DbConfig
-	Jwt  JwtConfig
-	Auth AuthConfig
-	Ws   WsConfig
+	Env   EnvConfig
+	Srv   ServerConfig
+	Db    DbConfig
+	Jwt   JwtConfig
+	Auth  AuthConfig
+	Ws    WsConfig
+	Kafka KafkaConfig
 }
 
 func LoadConfig() (Config, error) {
@@ -118,6 +144,9 @@ func LoadConfig() (Config, error) {
 	if err := v.Unmarshal(&cfg.Ws); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal websocket config: %w", err)
 	}
+	if err := v.Unmarshal(&cfg.Kafka); err != nil {
+		return Config{}, fmt.Errorf("failed to unmarshal kafka config: %w", err)
+	}
 
 	// Log important configuration (without sensitive data)
 	slog.Info("configuration loaded successfully",
@@ -140,6 +169,13 @@ func LoadConfig() (Config, error) {
 		"ping_period", cfg.Ws.PingPeriod,
 		"max_message_size", cfg.Ws.MaxMessageSize)
 
+	slog.Info("kafka configuration",
+		"brokers", cfg.Kafka.Brokers,
+		"topic_messages", cfg.Kafka.TopicMessages,
+		"group_id", cfg.Kafka.GroupID,
+		"max_retry", cfg.Kafka.MaxRetry,
+		"batch_size", cfg.Kafka.BatchSize)
+
 	return cfg, nil
 }
 
@@ -154,7 +190,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("DB_NAME", "db")
 	v.SetDefault("DB_USER", "user")
 	v.SetDefault("DB_HOST", "localhost")
-	v.SetDefault("DB_PORT", "9920")
+	v.SetDefault("DB_PORT", "5432")
 	v.SetDefault("DB_PASS", "password")
 
 	// Authentication defaults
@@ -171,6 +207,24 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("PONG_WAIT", 60*time.Second)
 	v.SetDefault("PING_PERIOD", 54*time.Second)
 	v.SetDefault("MAX_MESSAGE_SIZE", 512)
+
+	// Kafka defaults
+	v.SetDefault("KAFKA_BROKERS", []string{"localhost:9092"})
+	v.SetDefault("KAFKA_TOPIC_MESSAGES", "messenger-messages")
+	v.SetDefault("KAFKA_TOPIC_DLQ", "messenger-dlq")
+	v.SetDefault("KAFKA_GROUP_ID", "messenger-group")
+	v.SetDefault("KAFKA_MAX_RETRY", 3)
+	v.SetDefault("KAFKA_BATCH_SIZE", 100)
+	v.SetDefault("KAFKA_LINGER_MS", 10)
+	v.SetDefault("KAFKA_REQUIRED_ACKS", 1)
+	v.SetDefault("KAFKA_COMPRESSION_TYPE", "snappy")
+	v.SetDefault("KAFKA_SESSION_TIMEOUT", 30)
+	v.SetDefault("KAFKA_AUTO_OFFSET_RESET", "earliest")
+	v.SetDefault("KAFKA_MIN_BYTES", 10240)    // 10KB
+	v.SetDefault("KAFKA_MAX_BYTES", 10485760) // 10MB
+	v.SetDefault("KAFKA_MAX_WAIT_TIME", 250)
+	v.SetDefault("KAFKA_WRITE_TIMEOUT", 10)
+	v.SetDefault("KAFKA_READ_TIMEOUT", 10)
 }
 
 func (cfg Config) GetDbString() string {
