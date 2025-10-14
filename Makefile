@@ -73,7 +73,7 @@ logs-kafka-ui:
 
 # Console access
 console-postgres:
-	docker-compose exec postgres psql -U sibhelly -d db
+	docker-compose exec postgres psql -U user -d db
 
 console-app:
 	docker-compose exec app sh
@@ -95,10 +95,10 @@ dev: up-build logs-app
 
 # Database operations
 db-backup:
-	docker-compose exec postgres pg_dump -U sibhelly db > backup_$(shell date +%Y%m%d_%H%M%S).sql
+	docker-compose exec postgres pg_dump -U user db > backup_$(shell date +%Y%m%d_%H%M%S).sql
 
 db-restore:
-	@echo "Usage: docker-compose exec -T postgres psql -U sibhelly db < your_backup_file.sql"
+	@echo "Usage: docker-compose exec -T postgres psql -U user db < your_backup_file.sql"
 
 # Test commands
 test:
