@@ -30,10 +30,15 @@ type ChatHandlerInterface interface {
 	UpdateParticipant(c *gin.Context)
 }
 
+type MessageHandlerInterface interface {
+	SendMessage(c *gin.Context)
+}
+
 func CreateRoutes(
 	authHandler AuthHandlerInterface,
 	chatHandler ChatHandlerInterface,
 	wsHandler WsHandlerInterface,
+	messageHandler MessageHandlerInterface,
 	m middleware.JwtManagerInterface,
 	repo middleware.SessionRepositoryInterface,
 ) *gin.Engine {
@@ -59,6 +64,9 @@ func CreateRoutes(
 	r.POST("/chat/leave", middleware.AuthMiddleware(m, repo), chatHandler.LeaveChat)
 	r.DELETE("/chat/remove", middleware.AuthMiddleware(m, repo), chatHandler.RemoveParticipant)
 	r.PUT("/chat/participant", middleware.AuthMiddleware(m, repo), chatHandler.UpdateParticipant)
+
+	// message sender handler
+	r.POST("/message/send", middleware.AuthMiddleware(m, repo), messageHandler.SendMessage)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)

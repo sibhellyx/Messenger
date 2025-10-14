@@ -56,3 +56,11 @@ func (s *WsService) HandleConnection(userID, uuid string, conn *websocket.Conn, 
 
 	return nil
 }
+
+func (s *WsService) BroadcastMessage(msg []byte) error {
+	s.hub.Broadcast <- msg
+
+	slog.Debug("Message broadcasted", "message_size", len(msg))
+	return nil
+
+}
