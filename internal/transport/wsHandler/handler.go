@@ -1,12 +1,14 @@
 package wshandler
 
 import (
+	"encoding/json"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
 type WsServiceInterface interface {
-	HandleConnection(userID, uuid string, conn *websocket.Conn, userAgent, ipAddress string) error
+	HandleConnection(userID, uuid string, conn *websocket.Conn, userAgent, ipAddress string) (string, error)
 }
 
 type WsHandler struct {
@@ -42,12 +44,34 @@ func (h *WsHandler) Connect(c *gin.Context) {
 		return
 	}
 
-	h.service.HandleConnection(
+	clientID, err := h.service.HandleConnection(
 		userId.(string),
 		uuid.(string),
 		conn,
 		c.Request.UserAgent(),
 		c.ClientIP(),
 	)
+
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to handle connection"})
+		return
+	}
+
+	response := map[string]interface{}{
+		"type":      "connection_established",
+		"client_id": clientID,
+		"user_id":   userId.(string),
+	}
+
+	responseBytes, err := json.Marshal(response)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to marshal response"})
+		return
+	}
+
+	if err := conn.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
+		c.JSON(500, gin.H{"error": "failed to send client_id"})
+		return
+	}
 
 }

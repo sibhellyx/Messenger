@@ -21,7 +21,7 @@ func NewWsService(hub *ws.Hub) *WsService {
 	}
 }
 
-func (s *WsService) HandleConnection(userID, uuid string, conn *websocket.Conn, userAgent, ipAddress string) error {
+func (s *WsService) HandleConnection(userID, uuid string, conn *websocket.Conn, userAgent, ipAddress string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -47,14 +47,17 @@ func (s *WsService) HandleConnection(userID, uuid string, conn *websocket.Conn, 
 	go client.ReadPump()
 	go client.WritePump()
 
+	clientID := client.ID
+
 	slog.Info("New WebSocket connection handled",
 		"user_id", userID,
+		"client_id", clientID,
 		"uuid", uuid,
 		"user_agent", userAgent,
 		"ip_address", ipAddress,
 		"total_connections", len(s.clients))
 
-	return nil
+	return clientID, nil
 }
 
 func (s *WsService) BroadcastMessage(msg []byte) error {
