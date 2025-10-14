@@ -12,6 +12,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
 	"github.com/sibhellyx/Messenger/internal/db/chatrepo"
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
+	"github.com/sibhellyx/Messenger/internal/kafka"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
 	messageservice "github.com/sibhellyx/Messenger/internal/services/messageService"
@@ -78,6 +79,8 @@ func (srv *Server) Serve() {
 	hasher := hash.NewHasher(srv.cfg.Auth.Salt)
 	slog.Debug("init manager for auth")
 	manager := auth.NewManager(srv.cfg.Auth.SigningKey)
+	// init kafka
+	producer := kafka.NewProducer(srv.cfg.Kafka)
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")
@@ -100,7 +103,7 @@ func (srv *Server) Serve() {
 	slog.Debug("connecting to ws service")
 	wsService := wsservice.NewWsService(hub)
 	slog.Debug("connecting to message service")
-	messageService := messageservice.NewMessageService(wsService)
+	messageService := messageservice.NewMessageService(wsService, producer)
 	// init Handlers
 	slog.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)

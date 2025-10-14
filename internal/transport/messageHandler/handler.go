@@ -31,7 +31,7 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 		WrapError(c, err)
 		return
 	}
-	err = h.service.SendMessage(userId.(string), req)
+	err = h.service.SendMessage(c.Request.Context(), userId.(string), req)
 	if err != nil {
 		WrapError(c, err)
 		return
