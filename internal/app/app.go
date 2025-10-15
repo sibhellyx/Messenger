@@ -12,6 +12,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
 	"github.com/sibhellyx/Messenger/internal/db/chatrepo"
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
+	"github.com/sibhellyx/Messenger/internal/db/msgrepo"
 	"github.com/sibhellyx/Messenger/internal/kafka"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
@@ -89,6 +90,8 @@ func (srv *Server) Serve() {
 	authRepository := authrepo.NewAuthRepository(srv.db)
 	slog.Debug("connecting to chat repository")
 	chatRepository := chatrepo.NewChatRepository(srv.db)
+	slog.Debug("connecting to message repository")
+	messageRepository := msgrepo.NewMessageRepository(srv.db)
 
 	// init service for auth
 	slog.Debug("connecting to auth service")
@@ -105,7 +108,7 @@ func (srv *Server) Serve() {
 	slog.Debug("connecting to ws service")
 	wsService := wsservice.NewWsService(hub)
 	slog.Debug("connecting to message service")
-	messageService := messageservice.NewMessageService(wsService, producer)
+	messageService := messageservice.NewMessageService(wsService, producer, messageRepository)
 
 	slog.Debug("init kafka consumer")
 	consumer := kafka.NewConsumer(srv.cfg.Kafka, messageService)
@@ -157,5 +160,4 @@ func (srv *Server) Shutdown() {
 		slog.Error("HTTP server shutdown error", "error", err)
 		os.Exit(1)
 	}
-
 }

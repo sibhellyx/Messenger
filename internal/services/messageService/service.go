@@ -14,16 +14,24 @@ import (
 	wsservice "github.com/sibhellyx/Messenger/internal/services/wsService"
 )
 
+type MessageRepositoryInterface interface {
+	CreateMessage(ctx context.Context, message *entity.Message) error
+	UpdateMessageStatus(ctx context.Context, messageID uint, status entity.MessageStatus) error
+	GetMessageByID(ctx context.Context, id uint) (*entity.Message, error)
+}
+
 type MessageService struct {
 	wsService *wsservice.WsService
 	producer  *kafka.Producer
 	consumer  *kafka.Consumer
+	repo      MessageRepositoryInterface
 }
 
-func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer) *MessageService {
+func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer, repo MessageRepositoryInterface) *MessageService {
 	return &MessageService{
 		wsService: wsService,
 		producer:  producer,
+		repo:      repo,
 	}
 }
 
@@ -51,6 +59,11 @@ func (s *MessageService) ProcessKafkaMessage(ctx context.Context, message entity
 		"chat_id", message.ChatID,
 		"user_id", message.UserID)
 
+	err := s.repo.UpdateMessageStatus(ctx, message.ID, entity.MessageStatusDelivered)
+	if err != nil {
+		return fmt.Errorf("failed to update message status: %w", err)
+	}
+
 	wsMessage := map[string]interface{}{
 		"type":         "new_message",
 		"message_id":   message.ID,
@@ -72,7 +85,8 @@ func (s *MessageService) ProcessKafkaMessage(ctx context.Context, message entity
 
 	messageBytes, err := json.Marshal(wsMessage)
 	if err != nil {
-		return fmt.Errorf("failed to marshal WebSocket message: %w", err)
+		slog.Error("failed to marshal WebSocket message", "err", err, "message", message)
+		return errors.New("failed marshal message json to byte")
 	}
 
 	if err := s.wsService.BroadcastMessage(messageBytes); err != nil {
@@ -116,15 +130,21 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 	}
 
 	if err := message.Validate(); err != nil {
-		return fmt.Errorf("message validation failed: %w", err)
+		return err
 	}
 
-	// write to repos message with status pend(create message)
+	// write to repos message with status sent(create message)
+	err = s.repo.CreateMessage(ctx, &message)
+	if err != nil {
+		slog.Error("error create message", "chat_id", message.ChatID, "user_id", message.UserID, "err", err)
+		return errors.New("failed create message")
+	}
 
 	key := fmt.Sprintf("chat_%d", chatID)
 	err = s.producer.SendJSON(ctx, key, message)
 	if err != nil {
-		return fmt.Errorf("failed to send message to Kafka: %w", err)
+		slog.Error("error send message to Kafka", "chat_id", message.ChatID, "user_id", message.UserID, "err", err)
+		return errors.New("failed send message to Kafka")
 	}
 
 	slog.Info("Message sent successfully",

@@ -21,6 +21,7 @@ type MessageStatus string
 const (
 	MessageStatusSent      MessageStatus = "sent"
 	MessageStatusDelivered MessageStatus = "delivered"
+	MessageStatusFailed    MessageStatus = "failed"
 	MessageStatusRead      MessageStatus = "read"
 )
 
