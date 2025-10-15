@@ -108,7 +108,7 @@ func (srv *Server) Serve() {
 	slog.Debug("connecting to ws service")
 	wsService := wsservice.NewWsService(hub)
 	slog.Debug("connecting to message service")
-	messageService := messageservice.NewMessageService(wsService, producer, messageRepository)
+	messageService := messageservice.NewMessageService(wsService, producer, messageRepository, chatRepository)
 
 	slog.Debug("init kafka consumer")
 	consumer := kafka.NewConsumer(srv.cfg.Kafka, messageService)

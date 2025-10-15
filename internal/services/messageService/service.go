@@ -20,18 +20,25 @@ type MessageRepositoryInterface interface {
 	GetMessageByID(ctx context.Context, id uint) (*entity.Message, error)
 }
 
+type ChatRepositoryInterface interface {
+	GetChatById(chatID uint) (*entity.Chat, error)
+	GetParticipantByUserIdAndChatId(userID, chatID uint) (*entity.ChatParticipant, error)
+}
+
 type MessageService struct {
 	wsService *wsservice.WsService
 	producer  *kafka.Producer
 	consumer  *kafka.Consumer
 	repo      MessageRepositoryInterface
+	chatRepo  ChatRepositoryInterface
 }
 
-func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer, repo MessageRepositoryInterface) *MessageService {
+func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer, repo MessageRepositoryInterface, chatRepo ChatRepositoryInterface) *MessageService {
 	return &MessageService{
 		wsService: wsService,
 		producer:  producer,
 		repo:      repo,
+		chatRepo:  chatRepo,
 	}
 }
 
@@ -58,11 +65,6 @@ func (s *MessageService) ProcessKafkaMessage(ctx context.Context, message entity
 		"message_id", message.ID,
 		"chat_id", message.ChatID,
 		"user_id", message.UserID)
-
-	err := s.repo.UpdateMessageStatus(ctx, message.ID, entity.MessageStatusDelivered)
-	if err != nil {
-		return fmt.Errorf("failed to update message status: %w", err)
-	}
 
 	wsMessage := map[string]interface{}{
 		"type":         "new_message",
@@ -95,6 +97,11 @@ func (s *MessageService) ProcessKafkaMessage(ctx context.Context, message entity
 			"chat_id", message.ChatID)
 	}
 
+	err = s.repo.UpdateMessageStatus(ctx, message.ID, entity.MessageStatusDelivered)
+	if err != nil {
+		return errors.New("failed to update message status: " + err.Error())
+	}
+
 	slog.Info("Message processed successfully",
 		"message_id", message.ID,
 		"chat_id", message.ChatID,
@@ -113,6 +120,26 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 	if err != nil {
 		slog.Error("failed parse chat_id to uint", "chat_id", userID)
 		return errors.New("failed parse chat_id")
+	}
+
+	// get chat
+	chat, err := s.chatRepo.GetChatById(uint(chatID))
+	if err != nil {
+		slog.Error("failed get chat", "chat_id", chatID, "err", err)
+		return errors.New("failed get chat")
+	}
+	// get participant of this chat
+	participant, err := s.chatRepo.GetParticipantByUserIdAndChatId(uint(id), uint(chatID))
+	if err != nil || participant == nil {
+		slog.Error("failed get participant", "chat_id", chatID, "user_id", id, "err", err)
+		return errors.New("this user not participant of this chat")
+	}
+
+	if chat.Type == entity.ChatTypeChannel {
+		if participant.Role == entity.RoleMember {
+			slog.Error("permission denied, user with role member cant send to channel", "chat_id", chatID, "user_id", id, "err", err)
+			return errors.New("permission denied, member can't send message to channel")
+		}
 	}
 
 	message := entity.Message{

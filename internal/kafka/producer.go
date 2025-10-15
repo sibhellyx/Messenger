@@ -143,6 +143,7 @@ func (p *Producer) sendToDLQ(ctx context.Context, originalMsg Message, originalE
 		Topic:    p.config.TopicDLQ,
 		Balancer: &kafka.Hash{},
 	}
+	defer dlqWriter.Close()
 
 	dlqMsg := kafka.Message{
 		Key:   []byte(fmt.Sprintf("dlq_%s_%d", p.config.TopicMessages, time.Now().UnixNano())),
@@ -159,7 +160,6 @@ func (p *Producer) sendToDLQ(ctx context.Context, originalMsg Message, originalE
 			"original_error", originalError)
 	}
 
-	dlqWriter.Close()
 }
 
 func (p *Producer) SendJSONWithRetry(ctx context.Context, key string, value interface{}, maxRetries int) error {
