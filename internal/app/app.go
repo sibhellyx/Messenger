@@ -80,6 +80,7 @@ func (srv *Server) Serve() {
 	slog.Debug("init manager for auth")
 	manager := auth.NewManager(srv.cfg.Auth.SigningKey)
 	// init kafka
+	slog.Debug("init kafka producer")
 	producer := kafka.NewProducer(srv.cfg.Kafka)
 	defer producer.Close() //add closing producer
 
@@ -105,6 +106,18 @@ func (srv *Server) Serve() {
 	wsService := wsservice.NewWsService(hub)
 	slog.Debug("connecting to message service")
 	messageService := messageservice.NewMessageService(wsService, producer)
+
+	slog.Debug("init kafka consumer")
+	consumer := kafka.NewConsumer(srv.cfg.Kafka, messageService)
+
+	slog.Debug("set consumer to message service")
+	messageService.SetConsumer(consumer)
+
+	// start consumer
+	slog.Debug("start consumer in message service")
+	go messageService.StartConsumer(context.Background())
+	defer messageService.StopConsumer()
+
 	// init Handlers
 	slog.Debug("connecting to auth handler")
 	authHandler := authhandler.NewAuthHandler(authService)

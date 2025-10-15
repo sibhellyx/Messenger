@@ -17,6 +17,7 @@ import (
 type MessageService struct {
 	wsService *wsservice.WsService
 	producer  *kafka.Producer
+	consumer  *kafka.Consumer
 }
 
 func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer) *MessageService {
@@ -24,6 +25,68 @@ func NewMessageService(wsService *wsservice.WsService, producer *kafka.Producer)
 		wsService: wsService,
 		producer:  producer,
 	}
+}
+
+func (s *MessageService) SetConsumer(consumer *kafka.Consumer) {
+	s.consumer = consumer
+}
+
+func (s *MessageService) StartConsumer(ctx context.Context) {
+	if s.consumer == nil {
+		slog.Error("Consumer is not set")
+		return
+	}
+	s.consumer.Start(ctx)
+}
+
+func (s *MessageService) StopConsumer() {
+	if s.consumer != nil {
+		s.consumer.Stop()
+	}
+}
+
+func (s *MessageService) ProcessKafkaMessage(ctx context.Context, message entity.Message) error {
+	slog.Info("Processing message from Kafka",
+		"message_id", message.ID,
+		"chat_id", message.ChatID,
+		"user_id", message.UserID)
+
+	wsMessage := map[string]interface{}{
+		"type":         "new_message",
+		"message_id":   message.ID,
+		"chat_id":      message.ChatID,
+		"user_id":      message.UserID,
+		"content":      message.Content,
+		"message_type": message.Type,
+		"status":       entity.MessageStatusDelivered,
+		"client_id":    message.ClientID,
+		"timestamp":    message.CreatedAt,
+	}
+
+	if message.FileURL != nil {
+		wsMessage["file_url"] = *message.FileURL
+		wsMessage["file_name"] = message.FileName
+		wsMessage["file_size"] = message.FileSize
+		wsMessage["mime_type"] = message.MimeType
+	}
+
+	messageBytes, err := json.Marshal(wsMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal WebSocket message: %w", err)
+	}
+
+	if err := s.wsService.BroadcastMessage(messageBytes); err != nil {
+		slog.Warn("Failed to broadcast WebSocket message",
+			"error", err,
+			"chat_id", message.ChatID)
+	}
+
+	slog.Info("Message processed successfully",
+		"message_id", message.ID,
+		"chat_id", message.ChatID,
+		"status", entity.MessageStatusDelivered)
+
+	return nil
 }
 
 func (s *MessageService) SendMessage(ctx context.Context, userID string, req request.CreateMessage) error {
@@ -37,7 +100,8 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 		slog.Error("failed parse chat_id to uint", "chat_id", userID)
 		return errors.New("failed parse chat_id")
 	}
-	kafkaMessage := entity.Message{
+
+	message := entity.Message{
 		ChatID:    uint(chatID),
 		UserID:    uint(id),
 		Type:      req.Type,
@@ -51,40 +115,23 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 		ReplyToID: req.ReplyToID,
 	}
 
-	if err := kafkaMessage.Validate(); err != nil {
+	if err := message.Validate(); err != nil {
 		return fmt.Errorf("message validation failed: %w", err)
 	}
 
-	key := fmt.Sprintf("chat_%d", chatID)
+	// write to repos message with status pend(create message)
 
-	err = s.producer.SendJSON(ctx, key, kafkaMessage)
+	key := fmt.Sprintf("chat_%d", chatID)
+	err = s.producer.SendJSON(ctx, key, message)
 	if err != nil {
 		return fmt.Errorf("failed to send message to Kafka: %w", err)
 	}
 
-	wsMessage := map[string]interface{}{
-		"type":      "message",
-		"chat_id":   req.ChatID,
-		"user_id":   userID,
-		"content":   req.Content,
-		"client_id": req.ClientID,
-		"timestamp": kafkaMessage.CreatedAt,
-	}
-
-	wsMessageBytes, err := json.Marshal(wsMessage)
-	if err != nil {
-		slog.Warn("Failed to marshal WebSocket message", "error", err)
-	} else {
-		if err := s.wsService.BroadcastMessage(wsMessageBytes); err != nil {
-			slog.Warn("Failed to broadcast WebSocket message", "error", err)
-		}
-	}
-
 	slog.Info("Message sent successfully",
+		"message_id", message.ID,
 		"chat_id", req.ChatID,
 		"user_id", userID,
-		"client_id", req.ClientID,
-		"content_length", len(req.Content))
+		"client_id", req.ClientID)
 
 	return nil
 }
