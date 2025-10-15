@@ -293,16 +293,21 @@ func (r *ChatRepository) GetParticipantByUserIdAndChatId(userID, chatID uint) (*
 
 	err := r.db.
 		Where("chat_id = ? AND user_id = ? AND deleted_at IS NULL", chatID, userID).
-		Find(&participant).Error
+		First(&participant).Error
 
 	if err != nil {
-		slog.Error("failed to get chat participants",
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Debug("participant not found", "chat_id", chatID, "user_id", userID)
+			return nil, chaterrors.ErrFailedGetParticipant
+		}
+		slog.Error("failed to get chat participant",
 			"chat_id", chatID,
+			"user_id", userID,
 			"error", err)
 		return nil, chaterrors.ErrFailedGetParticipant
 	}
 
-	slog.Debug("successfully retrieved chat participants",
+	slog.Debug("successfully retrieved chat participant",
 		"chat_id", chatID,
 		"participant", participant)
 	return &participant, nil
