@@ -26,8 +26,9 @@ type Consumer struct {
 	processor MessageProcessor
 	shutdown  chan struct{}
 	wg        sync.WaitGroup
-	mu        sync.RWMutex
-	isRunning bool
+
+	limiter  chan struct{}
+	jobQueue chan kafka.Message
 }
 
 func NewConsumer(cfg config.KafkaConfig, processor MessageProcessor) *Consumer {
@@ -56,7 +57,12 @@ func NewConsumer(cfg config.KafkaConfig, processor MessageProcessor) *Consumer {
 		config:    cfg,
 		processor: processor,
 		shutdown:  make(chan struct{}),
-		isRunning: false,
+		limiter:   make(chan struct{}, 10),
+		jobQueue:  make(chan kafka.Message, 20),
+	}
+
+	for i := 0; i < cap(consumer.limiter); i++ {
+		consumer.limiter <- struct{}{}
 	}
 
 	slog.Info("Kafka consumer initialized",
@@ -67,33 +73,26 @@ func NewConsumer(cfg config.KafkaConfig, processor MessageProcessor) *Consumer {
 	return consumer
 }
 
-// Start
 func (c *Consumer) Start(ctx context.Context) {
-	c.mu.Lock()
-	if c.isRunning {
-		c.mu.Unlock()
-		slog.Warn("Consumer is already running")
-		return
+	workersCount := cap(c.limiter)
+	for i := 0; i < workersCount; i++ {
+		c.wg.Add(1)
+		go c.worker(ctx, i)
 	}
-	c.isRunning = true
-	c.mu.Unlock()
 
 	c.wg.Add(1)
-	go c.run(ctx)
-
-	slog.Info("Kafka consumer started")
+	go c.dispatcher(ctx)
 }
 
-func (c *Consumer) run(ctx context.Context) {
+func (c *Consumer) dispatcher(ctx context.Context) {
 	defer c.wg.Done()
+	defer close(c.jobQueue)
 
+	slog.Info("Dispatcher started")
+	defer slog.Info("Dispatcher stopped")
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("Consumer stopped by context")
-			return
-		case <-c.shutdown:
-			slog.Info("Consumer stopped by shutdown signal")
 			return
 		default:
 			readCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
@@ -113,24 +112,44 @@ func (c *Consumer) run(ctx context.Context) {
 				continue
 			}
 
-			c.wg.Add(1)
-			go c.processMessageAsync(ctx, msg)
+			select {
+			case c.jobQueue <- msg:
+				slog.Debug("Message dispatched to worker")
+			case <-time.After(5 * time.Second):
+				slog.Warn("Job channel full")
+			}
 		}
 	}
 }
 
-func (c *Consumer) processMessageAsync(ctx context.Context, msg kafka.Message) {
+func (c *Consumer) worker(ctx context.Context, id int) {
+	slog.Debug("Worker started", "worker_id", id)
+	defer slog.Info("Worker stopped", "worker_id", id)
 	defer c.wg.Done()
 
-	processingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	if err := c.processMessageWithRetry(processingCtx, msg); err != nil {
-		slog.Error("Failed to process message after retries",
-			"offset", msg.Offset,
-			"partition", msg.Partition,
-			"error", err)
-		c.handlePoisonPill(msg, err)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-c.jobQueue:
+			if !ok {
+				return
+			}
+			select {
+			case <-c.limiter:
+				err := c.processMessageWithRetry(ctx, msg)
+				if err != nil {
+					slog.Error("Failed to process message after retries",
+						"offset", msg.Offset,
+						"partition", msg.Partition,
+						"error", err)
+					c.handlePoisonPill(msg, err)
+				}
+				c.limiter <- struct{}{}
+			case <-ctx.Done():
+				return
+			}
+		}
 	}
 }
 
@@ -269,29 +288,8 @@ func (c *Consumer) sendToDLQ(msg kafka.Message, processingErr error) error {
 
 // Stop consumer
 func (c *Consumer) Stop() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if !c.isRunning {
-		return
-	}
-
-	slog.Info("Stopping Kafka consumer...")
 	close(c.shutdown)
-	c.isRunning = false
-
-	done := make(chan struct{})
-	go func() {
-		c.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		slog.Info("Kafka consumer stopped gracefully")
-	case <-time.After(30 * time.Second):
-		slog.Warn("Kafka consumer stopped by timeout, some messages may not be processed")
-	}
+	c.wg.Wait()
 }
 
 // Close reader and dlqWriter
