@@ -141,7 +141,7 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 	}
 
 	key := fmt.Sprintf("chat_%d", chatID)
-	err = s.producer.SendJSON(ctx, key, message)
+	err = s.producer.SendJSONWithRetry(ctx, key, message, 5)
 	if err != nil {
 		slog.Error("error send message to Kafka", "chat_id", message.ChatID, "user_id", message.UserID, "err", err)
 		return errors.New("failed send message to Kafka")

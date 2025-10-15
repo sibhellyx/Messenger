@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -159,6 +160,41 @@ func (p *Producer) sendToDLQ(ctx context.Context, originalMsg Message, originalE
 	}
 
 	dlqWriter.Close()
+}
+
+func (p *Producer) SendJSONWithRetry(ctx context.Context, key string, value interface{}, maxRetries int) error {
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err := p.SendJSON(ctx, key, value)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		slog.Warn("Failed to send message to Kafka, retrying...",
+			"attempt", attempt,
+			"max_retries", maxRetries,
+			"key", key,
+			"error", err)
+
+		if attempt < maxRetries {
+			backoff := time.Duration(attempt*attempt) * time.Second
+			select {
+			case <-time.After(backoff):
+				continue
+			case <-ctx.Done():
+				err := fmt.Errorf("context cancelled while retrying: %w", ctx.Err())
+				slog.Warn("context cancelled", "err", err)
+				return errors.New("failed send message")
+			}
+		}
+	}
+	err := fmt.Errorf("failed to send message after %d attempts: %w", maxRetries, lastErr)
+	slog.Warn("Failed to send message to Kafka, retrying...",
+		"key", key,
+		"error", err)
+	return errors.New("failed send message")
 }
 
 // close kafka writer
