@@ -81,6 +81,7 @@ func (srv *Server) Serve() {
 	manager := auth.NewManager(srv.cfg.Auth.SigningKey)
 	// init kafka
 	producer := kafka.NewProducer(srv.cfg.Kafka)
+	defer producer.Close() //add closing producer
 
 	// init repos for auth
 	slog.Debug("connecting to auth repository")
