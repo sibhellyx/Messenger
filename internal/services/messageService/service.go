@@ -49,7 +49,7 @@ func (s *MessageService) StartConsumer(ctx context.Context) {
 
 func (s *MessageService) StopConsumer() {
 	if s.consumer != nil {
-		s.consumer.Stop()
+		s.consumer.Close()
 	}
 }
 
