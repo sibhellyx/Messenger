@@ -23,6 +23,7 @@ type MessageRepositoryInterface interface {
 type ChatRepositoryInterface interface {
 	GetChatById(chatID uint) (*entity.Chat, error)
 	GetParticipantByUserIdAndChatId(userID, chatID uint) (*entity.ChatParticipant, error)
+	GetMessagesByChatId(chatId uint) ([]*entity.Message, error)
 }
 
 type MessageService struct {
@@ -181,4 +182,28 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 		"client_id", req.ClientID)
 
 	return nil
+}
+
+func (s *MessageService) GetMessagesByChatId(userID, chatID string) ([]*entity.Message, error) {
+	userId, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", userID)
+		return nil, errors.New("failed parse user_id")
+	}
+	chatId, err := strconv.ParseUint(chatID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "chat_id", userID)
+		return nil, errors.New("failed parse chat_id")
+	}
+	_, err = s.chatRepo.GetChatById(uint(chatId))
+	if err != nil {
+		slog.Error("failed get chat", "chat_id", chatID, "err", err)
+		return nil, errors.New("failed get chat")
+	}
+	participant, err := s.chatRepo.GetParticipantByUserIdAndChatId(uint(userId), uint(chatId))
+	if err != nil || participant == nil {
+		slog.Error("failed get participant", "chat_id", chatID, "user_id", userId, "err", err)
+		return nil, errors.New("this user not participant of this chat")
+	}
+	return s.chatRepo.GetMessagesByChatId(uint(chatId))
 }

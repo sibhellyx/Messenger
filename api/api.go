@@ -32,6 +32,7 @@ type ChatHandlerInterface interface {
 
 type MessageHandlerInterface interface {
 	SendMessage(c *gin.Context)
+	GetMessages(c *gin.Context)
 }
 
 func CreateRoutes(
@@ -67,6 +68,7 @@ func CreateRoutes(
 
 	// message sender handler
 	r.POST("/message/send", middleware.AuthMiddleware(m, repo), messageHandler.SendMessage)
+	r.GET("/chat/messages", middleware.AuthMiddleware(m, repo), messageHandler.GetMessages)
 
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)

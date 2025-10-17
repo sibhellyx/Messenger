@@ -42,8 +42,8 @@ type Message struct {
 	ReplyToID *uint `gorm:"index" json:"replyToId,omitempty"`
 
 	// Relationships
-	Chat    Chat       `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
-	User    User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Chat    *Chat      `gorm:"foreignKey:ChatID" json:"chat,omitempty"`
+	User    *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	ReplyTo *Message   `gorm:"foreignKey:ReplyToID" json:"replyTo,omitempty"`
 	Replies []*Message `gorm:"foreignKey:ReplyToID" json:"replies,omitempty"`
 }

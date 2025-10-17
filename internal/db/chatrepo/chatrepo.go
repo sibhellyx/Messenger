@@ -333,6 +333,28 @@ func (r *ChatRepository) UpdateParticipant(participant *entity.ChatParticipant) 
 	return nil
 }
 
+func (r *ChatRepository) GetMessagesByChatId(chatID uint) ([]*entity.Message, error) {
+	slog.Debug("getting chat messages", "chat_id", chatID)
+
+	var messages []*entity.Message
+
+	err := r.db.
+		Where("chat_id = ? AND deleted_at IS NULL", chatID).
+		Find(&messages).Error
+
+	if err != nil {
+		slog.Error("failed to get chat messages",
+			"chat_id", chatID,
+			"error", err)
+		return nil, chaterrors.ErrFailedGetParticipants
+	}
+
+	slog.Debug("successfully get messages of chat",
+		"chat_id", chatID,
+		"messages_count", len(messages))
+	return messages, nil
+}
+
 func (r *ChatRepository) UserExist(userID uint) bool {
 	var count int64
 	r.db.Model(&entity.User{}).Where("id = ?", userID).Count(&count)
