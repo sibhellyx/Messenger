@@ -3,6 +3,7 @@ package wsservice
 import (
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sibhellyx/Messenger/internal/ws"
@@ -28,7 +29,8 @@ func (s *WsService) HandleConnection(userID, uuid string, conn *websocket.Conn, 
 	// close old connection
 	if existingClient, exists := s.clients[userID]; exists {
 		slog.Info("Closing existing connection for user", "user_id", userID)
-		s.hub.Unregister <- existingClient
+		existingClient.Close()
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	// creating new client

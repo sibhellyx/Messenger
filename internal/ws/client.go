@@ -2,6 +2,7 @@ package ws
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +16,9 @@ type Client struct {
 	UserAgent string
 	LastIP    string
 	hub       *Hub
+	done      chan struct{}
+	mu        sync.RWMutex
+	isActive  bool
 }
 
 func NewClient(
@@ -33,7 +37,40 @@ func NewClient(
 		UserAgent: userAgent,
 		LastIP:    lastIp,
 		hub:       hub,
+		done:      make(chan struct{}),
+		isActive:  true,
 	}
+}
+
+func (c *Client) Done() <-chan struct{} {
+	return c.done
+}
+
+func (c *Client) IsActive() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isActive
+}
+
+func (c *Client) Close() {
+
+	slog.Debug("Close connection",
+		"client_id", c.ID,
+		"client_uuid", c.UUID,
+		"user_agent", c.UserAgent,
+		"remote_addr", c.LastIP,
+	)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.isActive {
+		c.isActive = false
+		close(c.done)
+		close(c.Send)
+		c.Conn.Close()
+	}
+	c.hub.Unregister <- c
 }
 
 func (c *Client) ReadPump() {
@@ -41,7 +78,7 @@ func (c *Client) ReadPump() {
 		slog.Info("ReadPump stopped",
 			"client_id", c.ID,
 			"client_uuid", c.UUID)
-		c.Conn.Close()
+		c.Close()
 	}()
 
 	slog.Debug("ReadPump started",

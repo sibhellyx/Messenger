@@ -34,17 +34,14 @@ func (h *Hub) Run() {
 			h.Clients[client] = true
 		case client := <-h.Unregister:
 			slog.Info("unregister", "user_id", client.ID)
-			if _, ok := h.Clients[client]; ok {
-				delete(h.Clients, client)
-				close(client.Send)
-			}
+			delete(h.Clients, client)
 		case message := <-h.Broadcast:
 			for client := range h.Clients {
 				slog.Info("broadcast", "message", string(message), "recived_id", client.ID)
 				select {
 				case client.Send <- message:
 				default:
-					close(client.Send)
+					client.Close()
 					delete(h.Clients, client)
 				}
 			}
