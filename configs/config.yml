@@ -40,3 +40,5 @@ KAFKA_MAX_WAIT_TIME: 250
 # timeouts kafka
 KAFKA_WRITE_TIMEOUT: 10
 KAFKA_READ_TIMEOUT: 10
+# kafka max msg count in queue in read
+KAFKA_MAX_QUEUE_SIZE: 10

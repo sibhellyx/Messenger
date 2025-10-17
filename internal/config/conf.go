@@ -64,6 +64,9 @@ type KafkaConfig struct {
 	// Timeouts
 	WriteTimeout int `mapstructure:"KAFKA_WRITE_TIMEOUT"` // write timeout in seconds
 	ReadTimeout  int `mapstructure:"KAFKA_READ_TIMEOUT"`  // read timeout in seconds
+
+	// Queue size
+	MaxQueueSize int `mapstructure:"KAFKA_MAX_QUEUE_SIZE"`
 }
 
 type Config struct {
