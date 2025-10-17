@@ -57,8 +57,8 @@ func NewConsumer(cfg config.KafkaConfig, processor MessageProcessor) *Consumer {
 		config:    cfg,
 		processor: processor,
 		shutdown:  make(chan struct{}),
-		limiter:   make(chan struct{}, 10),
-		jobQueue:  make(chan kafka.Message, 20),
+		limiter:   make(chan struct{}, cfg.MaxQueueSize),
+		jobQueue:  make(chan kafka.Message, 2*cfg.MaxQueueSize),
 	}
 
 	for i := 0; i < cap(consumer.limiter); i++ {
@@ -95,11 +95,7 @@ func (c *Consumer) dispatcher(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			readCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-
-			msg, err := c.reader.FetchMessage(readCtx)
-			cancel()
-
+			msg, err := c.fetchMessageWithRetry(ctx)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					continue
@@ -116,10 +112,31 @@ func (c *Consumer) dispatcher(ctx context.Context) {
 			case c.jobQueue <- msg:
 				slog.Debug("Message dispatched to worker")
 			case <-time.After(5 * time.Second):
+				c.handleQueueFull(ctx, msg)
 				slog.Warn("Job channel full")
 			}
 		}
 	}
+}
+
+func (c *Consumer) fetchMessageWithRetry(ctx context.Context) (kafka.Message, error) {
+	for attempt := 1; attempt <= c.config.MaxRetry; attempt++ {
+		msg, err := c.reader.FetchMessage(ctx)
+		if err == nil {
+			return msg, nil
+		}
+
+		if errors.Is(err, context.Canceled) {
+			return kafka.Message{}, err
+		}
+
+		slog.Warn("Failed to fetch message, retrying...",
+			"attempt", attempt,
+			"error", err)
+
+		time.Sleep(time.Duration(attempt) * time.Second)
+	}
+	return kafka.Message{}, errors.New("failed to fetch message after retries")
 }
 
 func (c *Consumer) worker(ctx context.Context, id int) {
@@ -214,6 +231,40 @@ func (c *Consumer) processSingleMessage(ctx context.Context, message kafka.Messa
 
 }
 
+func (c *Consumer) handleQueueFull(ctx context.Context, msg kafka.Message) {
+	slog.Warn("Queue full, processing message synchronously",
+		"queue_size", len(c.jobQueue),
+		"max_queue_size", cap(c.jobQueue))
+
+	select {
+	case <-c.limiter:
+		go c.processSyncMessage(ctx, msg)
+
+	case <-ctx.Done():
+		c.reader.CommitMessages(ctx, msg)
+
+	case <-time.After(5 * time.Second):
+		slog.Error("Sync processing timeout, committing message",
+			"offset", msg.Offset)
+		c.reader.CommitMessages(ctx, msg)
+	}
+}
+
+func (c *Consumer) processSyncMessage(ctx context.Context, msg kafka.Message) {
+	defer func() {
+		c.limiter <- struct{}{}
+	}()
+
+	if err := c.processMessageWithRetry(ctx, msg); err != nil {
+		slog.Error("Sync message processing failed",
+			"offset", msg.Offset,
+			"error", err)
+		c.handlePoisonPill(msg, err)
+	} else {
+		c.reader.CommitMessages(ctx, msg)
+	}
+}
+
 func (c *Consumer) handlePoisonPill(msg kafka.Message, processingErr error) {
 	slog.Error("Handling poison pill message",
 		"offset", msg.Offset,
@@ -289,7 +340,23 @@ func (c *Consumer) sendToDLQ(msg kafka.Message, processingErr error) error {
 // Stop consumer
 func (c *Consumer) Stop() {
 	close(c.shutdown)
-	c.wg.Wait()
+
+	done := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Info("Consumer stopped gracefully")
+	case <-time.After(30 * time.Second):
+		slog.Error("Force shutdown after timeout")
+
+		slog.Warn("Queue state at shutdown",
+			"remaining_messages", len(c.jobQueue),
+			"sync_workers_busy", len(c.limiter))
+	}
 }
 
 // Close reader and dlqWriter
