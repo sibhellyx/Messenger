@@ -1,0 +1,793 @@
+openapi: 3.0.3
+info:
+  title: Messenger API
+  description: REST API для мессенджера с поддержкой чатов, сообщений и WebSocket соединений
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@messenger.com
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.messenger.com/v1
+    description: Production server
+
+paths:
+  /register:
+    post:
+      summary: Регистрация нового пользователя
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Успешная регистрация
+        '400':
+          description: Неверные данные запроса
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /login:
+    post:
+      summary: Вход в систему
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+        '401':
+          description: Неверные учетные данные
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /refresh:
+    post:
+      summary: Обновление токена доступа
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+        '401':
+          description: Невалидный или просроченный токен
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /logout:
+    post:
+      summary: Выход из системы
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Успешный выход
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/create:
+    post:
+      summary: Создание нового чата
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatRequest'
+      responses:
+        '201':
+          description: Чат успешно создан
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat:
+    delete:
+      summary: Удаление чата
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Чат успешно удален
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+    put:
+      summary: Обновление информации о чате
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChatRequest'
+      responses:
+        '200':
+          description: Информация о чате успешно обновлена
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chats:
+    get:
+      summary: Получение списка чатов пользователя
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список чатов успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chat'
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chats/all:
+    get:
+      summary: Получение всех чатов (административная функция)
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список всех чатов успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chat'
+        '401':
+          description: Неавторизованный доступ
+        '403':
+          description: Недостаточно прав
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chats/search:
+    get:
+      summary: Поиск чатов
+      tags:
+        - Chats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Поисковый запрос
+      responses:
+        '200':
+          description: Результаты поиска успешно получены
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chat'
+        '400':
+          description: Неверный поисковый запрос
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/add:
+    post:
+      summary: Добавление участника в чат
+      tags:
+        - Participants
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantRequest'
+      responses:
+        '200':
+          description: Участник успешно добавлен
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '403':
+          description: Недостаточно прав для добавления участника
+        '404':
+          description: Чат или пользователь не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/participants:
+    get:
+      summary: Получение списка участников чата
+      tags:
+        - Participants
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: ID чата
+      responses:
+        '200':
+          description: Список участников успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Participant'
+        '400':
+          description: Неверные параметры запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/leave:
+    post:
+      summary: Выход из чата
+      tags:
+        - Participants
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantRequest'
+      responses:
+        '200':
+          description: Успешный выход из чата
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/remove:
+    delete:
+      summary: Удаление участника из чата
+      tags:
+        - Participants
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantRequest'
+      responses:
+        '200':
+          description: Участник успешно удален
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '403':
+          description: Недостаточно прав для удаления участника
+        '404':
+          description: Чат или участник не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/participant:
+    put:
+      summary: Обновление роли участника чата
+      tags:
+        - Participants
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantUpdateRequest'
+      responses:
+        '200':
+          description: Роль участника успешно обновлена
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '403':
+          description: Недостаточно прав для изменения роли
+        '404':
+          description: Чат или участник не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /message/send:
+    post:
+      summary: Отправка сообщения
+      tags:
+        - Messages
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessage'
+      responses:
+        '201':
+          description: Сообщение успешно отправлено
+        '400':
+          description: Неверные данные запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /chat/messages:
+    get:
+      summary: Получение сообщений чата
+      tags:
+        - Messages
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: ID чата
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Количество сообщений для возврата
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Сообщения успешно получены
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+        '400':
+          description: Неверные параметры запроса
+        '401':
+          description: Неавторизованный доступ
+        '404':
+          description: Чат не найден
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /connect:
+    get:
+      summary: Установка WebSocket соединения
+      tags:
+        - WebSocket
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: Успешное переключение на WebSocket протокол
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Внутренняя ошибка сервера
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - surname
+        - tg_username
+        - password
+      properties:
+        name:
+          type: string
+          description: Имя пользователя
+          example: "Иван"
+        surname:
+          type: string
+          description: Фамилия пользователя
+          example: "Иванов"
+        tg_username:
+          type: string
+          description: Telegram username
+          example: "ivanov"
+        password:
+          type: string
+          description: Пароль
+          format: password
+          example: "securePassword123"
+
+    LoginRequest:
+      type: object
+      required:
+        - tg_username
+        - password
+      properties:
+        tg_username:
+          type: string
+          description: Telegram username
+          example: "ivanov"
+        password:
+          type: string
+          description: Пароль
+          format: password
+          example: "securePassword123"
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token
+
+    CreateChatRequest:
+      type: object
+      required:
+        - type
+      properties:
+        name:
+          type: string
+          description: Название чата (обязательно для групповых чатов и каналов)
+          example: "Рабочий чат"
+        description:
+          type: string
+          nullable: true
+          description: Описание чата
+          example: "Чат для обсуждения рабочих вопросов"
+        type:
+          type: string
+          enum: [direct, group, channel]
+          description: Тип чата
+          example: "group"
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL аватара чата
+          example: "https://example.com/avatar.jpg"
+        is_private:
+          type: boolean
+          description: Приватность чата
+          default: false
+        participants:
+          type: array
+          description: Список участников (для directed чата должен содержать ровно одного участника)
+          items:
+            $ref: '#/components/schemas/Participant'
+
+    UpdateChatRequest:
+      type: object
+      required:
+        - chat_id
+      properties:
+        chat_id:
+          type: string
+          description: ID чата
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          description: Новое название чата
+          example: "Обновленное название чата"
+        description:
+          type: string
+          nullable: true
+          description: Новое описание чата
+          example: "Обновленное описание"
+        avatarUrl:
+          type: string
+          nullable: true
+          description: Новый URL аватара чата
+          example: "https://example.com/new-avatar.jpg"
+        is_private:
+          type: boolean
+          description: Новая настройка приватности
+          example: true
+
+    ChatRequest:
+      type: object
+      required:
+        - chat_id
+      properties:
+        chat_id:
+          type: string
+          description: ID чата
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    ParticipantRequest:
+      type: object
+      required:
+        - chat_id
+        - user_id
+      properties:
+        chat_id:
+          type: string
+          description: ID чата
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        user_id:
+          type: string
+          description: ID пользователя
+          example: "123e4567-e89b-12d3-a456-426614174001"
+
+    ParticipantUpdateRequest:
+      type: object
+      required:
+        - chat_id
+        - user_id
+        - role
+      properties:
+        chat_id:
+          type: string
+          description: ID чата
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        user_id:
+          type: string
+          description: ID пользователя
+          example: "123e4567-e89b-12d3-a456-426614174001"
+        role:
+          type: string
+          description: Новая роль участника
+          example: "admin"
+
+    CreateMessage:
+      type: object
+      required:
+        - chatId
+        - content
+        - type
+        - clientId
+      properties:
+        chatId:
+          type: string
+          description: ID чата
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        content:
+          type: string
+          description: Текст сообщения
+          example: "Привет, как дела?"
+        type:
+          type: string
+          enum: [text, image, file, system]
+          description: Тип сообщения
+          example: "text"
+        replyToId:
+          type: integer
+          nullable: true
+          description: ID сообщения, на которое отвечаем
+          example: 42
+        fileUrl:
+          type: string
+          nullable: true
+          description: URL файла (для сообщений типа file или image)
+          example: "https://example.com/file.jpg"
+        fileName:
+          type: string
+          nullable: true
+          description: Имя файла
+          example: "document.pdf"
+        fileSize:
+          type: integer
+          nullable: true
+          description: Размер файла в байтах
+          example: 1024000
+        mimeType:
+          type: string
+          nullable: true
+          description: MIME тип файла
+          example: "application/pdf"
+        clientId:
+          type: string
+          description: Клиентский ID для отслеживания доставки
+          example: "client-123"
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID чата
+        name:
+          type: string
+          description: Название чата
+        description:
+          type: string
+          nullable: true
+          description: Описание чата
+        type:
+          type: string
+          enum: [direct, group, channel]
+          description: Тип чата
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL аватара чата
+        is_private:
+          type: boolean
+          description: Приватность чата
+        created_at:
+          type: string
+          format: date-time
+          description: Время создания чата
+        updated_at:
+          type: string
+          format: date-time
+          description: Время последнего обновления чата
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID участника
+        user_id:
+          type: string
+          description: ID пользователя
+        chat_id:
+          type: string
+          description: ID чата
+        role:
+          type: string
+          description: Роль участника
+        joined_at:
+          type: string
+          format: date-time
+          description: Время вступления в чат
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID сообщения
+        chat_id:
+          type: string
+          description: ID чата
+        user_id:
+          type: string
+          description: ID отправителя
+        content:
+          type: string
+          description: Текст сообщения
+        type:
+          type: string
+          enum: [text, image, file, system]
+          description: Тип сообщения
+        reply_to_id:
+          type: integer
+          nullable: true
+          description: ID сообщения, на которое отвечаем
+        file_url:
+          type: string
+          nullable: true
+          description: URL файла
+        file_name:
+          type: string
+          nullable: true
+          description: Имя файла
+        file_size:
+          type: integer
+          nullable: true
+          description: Размер файла
+        mime_type:
+          type: string
+          nullable: true
+          description: MIME тип файла
+        created_at:
+          type: string
+          format: date-time
+          description: Время отправки сообщения
+
+tags:
+  - name: Auth
+    description: Аутентификация и авторизация
+  - name: Chats
+    description: Управление чатами
+  - name: Participants
+    description: Управление участниками чатов
+  - name: Messages
+    description: Отправка и получение сообщений
+  - name: WebSocket
+    description: WebSocket соединения
