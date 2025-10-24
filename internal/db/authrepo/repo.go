@@ -25,7 +25,7 @@ func (r *AuthRepository) CreateUser(user entity.User) error {
 	result := r.db.Create(&user)
 	if result.Error != nil {
 		slog.Error("failed to create user", "error", result.Error, "tgname", user.Tgname)
-		return result.Error
+		return errors.New("failed create user")
 	}
 
 	slog.Info("user created successfully", "user_id", user.ID, "email", user.Tgname)
@@ -154,4 +154,19 @@ func (r *AuthRepository) CountActiveSessions(userId uint) (int64, error) {
 		slog.Error("database error", "error", err.Error(), "user_id", userId)
 	}
 	return count, err
+}
+
+func (r *AuthRepository) ActivateUser(userId uint) error {
+	slog.Debug("activating user start", "user_id", userId)
+	result := r.db.Model(&entity.User{}).Where("id = ?", userId).Update("is_active", true)
+	if result.Error != nil {
+		slog.Error("failed to activate user", "error", result.Error, "user_id", userId)
+		return errors.New("failed activate user")
+	}
+	if result.RowsAffected == 0 {
+		slog.Warn("user not found for activation", "user_id", userId)
+		return errors.New("user not found")
+	}
+	slog.Debug("activating user completed", "user_id", userId)
+	return nil
 }
