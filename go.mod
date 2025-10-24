@@ -9,12 +9,14 @@ require (
 	gorm.io/gorm v1.31.0
 )
 
-require github.com/golang-jwt/jwt/v5 v5.3.0
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/segmentio/kafka-go v0.4.49
+)
 
 require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	github.com/segmentio/kafka-go v0.4.49 // indirect
 )
 
 require github.com/gorilla/websocket v1.5.3 // direct
@@ -30,6 +32,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.20.0 // indirect
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/uuid v1.6.0 // direct

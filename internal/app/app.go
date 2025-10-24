@@ -7,7 +7,10 @@ import (
 	"os"
 	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sibhellyx/Messenger/api"
+	"github.com/sibhellyx/Messenger/internal/bot"
+	"github.com/sibhellyx/Messenger/internal/bot/actions"
 	"github.com/sibhellyx/Messenger/internal/config"
 	"github.com/sibhellyx/Messenger/internal/db/authrepo"
 	"github.com/sibhellyx/Messenger/internal/db/chatrepo"
@@ -103,6 +106,14 @@ func (srv *Server) Serve() {
 		time.Duration(srv.cfg.Jwt.RefreshTTL*int(time.Hour*24)),
 		srv.cfg.Jwt.ActiveSessions,
 	)
+
+	// create bot
+	botApi, _ := tgbotapi.NewBotAPI(srv.cfg.Bot.Token)
+	bot := bot.NewBot(botApi, authService)
+	go bot.Run(srv.ctx)
+	bot.RegisterAction("start", actions.HandleStart())
+	authService.SetBotService(bot)
+
 	slog.Debug("connecting to chat service")
 	chatService := chatservice.NewChatService(chatRepository)
 	slog.Debug("connecting to ws service")

@@ -12,6 +12,10 @@ type EnvConfig struct {
 	Environment string `mapstructure:"ENVIRONMENT"` // type app
 }
 
+type BotConfig struct {
+	Token string `mapstructure:"BOT_TOKEN"`
+}
+
 type ServerConfig struct {
 	Port string `mapstructure:"PORT"`
 }
@@ -71,6 +75,7 @@ type KafkaConfig struct {
 
 type Config struct {
 	Env   EnvConfig
+	Bot   BotConfig
 	Srv   ServerConfig
 	Db    DbConfig
 	Jwt   JwtConfig
@@ -131,6 +136,9 @@ func LoadConfig() (Config, error) {
 
 	if err := v.Unmarshal(&cfg.Env); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal env config: %w", err)
+	}
+	if err := v.Unmarshal(&cfg.Bot); err != nil {
+		return Config{}, fmt.Errorf("failed to unmarshal bot config: %w", err)
 	}
 	if err := v.Unmarshal(&cfg.Srv); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal server config: %w", err)

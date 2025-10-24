@@ -25,6 +25,7 @@ type RepositoryInterface interface {
 	DeleteOldestSession(userId uint) error
 	GetUserByTgname(tgname string) (*entity.User, error)
 	CountActiveSessions(userId uint) (int64, error)
+	ActivateUser(userId uint) error
 }
 
 type HasherInterface interface {
@@ -39,11 +40,16 @@ type TokenManagerInterface interface {
 	Parse(accessToken string) (payload.JwtPayload, error)
 }
 
+type BotServiceInterface interface {
+	GetLinkForFinishRegister(tgName string) string
+}
+
 type AuthService struct {
 	repository RepositoryInterface
 
 	hasher       HasherInterface
 	tokenManager TokenManagerInterface
+	bot          BotServiceInterface
 
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
@@ -67,35 +73,61 @@ func NewAuthService(
 	}
 }
 
+func (s *AuthService) SetBotService(bot BotServiceInterface) {
+	s.bot = bot
+}
+
 // register user service layer
-func (s *AuthService) RegisterUser(r request.RegisterRequest) error {
+func (s *AuthService) RegisterUser(r request.RegisterRequest) (string, error) {
 	slog.Debug("service register started")
 	err := r.Validate() //function return error if user not isValid
 	if err != nil {
 		slog.Error("error validating user input", "error", err.Error())
-		return err
+		return "", err
 	}
 	r.Password, err = s.hasher.Hash(r.Password) //hash password
 	if err != nil {
 		slog.Error("failed hash password", "error", err.Error())
-		return err
+		return "", err
 	}
 
+	// write repo
 	err = s.repository.CreateUser(entity.User{
 		Name:     r.Name,
 		Surname:  r.Surname,
 		Tgname:   r.Tgname,
 		Password: r.Password,
-	}) //write to repo
+		IsActive: false,
+	})
 	if err != nil {
 		slog.Error("failed create user in repo", "error", err.Error())
-		return err
+		return "", err
 	}
+	// send to bot this user TgName and get link for register
+	link := s.bot.GetLinkForFinishRegister(r.Tgname)
+
 	slog.Debug("service register completed")
+	return link, nil
+}
+
+// activate user account after start tg bot
+func (s *AuthService) Activate(tgName string) error {
+	slog.Debug("activating user", "tgName", tgName)
+	user, err := s.repository.GetUserByTgname(tgName)
+	if err != nil {
+		slog.Error("failed get user", "error", err)
+		return errors.New("failed get user")
+	}
+	err = s.repository.ActivateUser(user.ID)
+	if err != nil {
+		slog.Error("failed activate user", "error", err)
+		return errors.New("failed activate user")
+	}
+	slog.Debug("activating user completed", "tgName", tgName)
 	return nil
 }
 
-func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error) {
+func (s *AuthService) SignInWithoutCode(user request.LoginRequest, params request.LoginParams) (response.Tokens, error) {
 	slog.Debug("service login started")
 	err := user.Validate()
 	if err != nil {
@@ -111,10 +143,38 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 
 	if !s.hasher.ComparePassword(u.Password, user.Password) {
 		slog.Error("invalid password", "tgname", user.Tgname)
+		// return false and error
 		return response.Tokens{}, errors.New("invalid credentials")
+
 	}
 
 	return s.createSession(u.ID, params)
+}
+
+func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginParams) (uint, error) {
+	slog.Debug("service login started")
+	err := user.Validate()
+	if err != nil {
+		slog.Error("error validating user input", "error", err.Error())
+		return 0, err
+	}
+
+	u, err := s.repository.GetUserByTgname(user.Tgname)
+	if err != nil {
+		slog.Error("failed to get user", "error", err.Error())
+		return 0, errors.New("invalid credentials")
+	}
+
+	if !s.hasher.ComparePassword(u.Password, user.Password) {
+		slog.Error("invalid password", "tgname", user.Tgname)
+		// return false and error
+		return 0, errors.New("invalid credentials")
+
+	}
+	// return that now need input code from tg
+	// generate code and send it in telegram to user
+	// return userID and nil
+	return u.ID, nil
 }
 
 func (s *AuthService) RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error) {
@@ -227,6 +287,8 @@ func (s *AuthService) generateSessionAndSave(session entity.Session, isNewSessio
 	return res, nil
 
 }
+
+// confirm code function need and after create session
 
 func (s *AuthService) Logout(userId, uuid string) error {
 	slog.Debug("logout from session", "uuid", uuid, "user_id", userId)

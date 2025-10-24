@@ -13,8 +13,8 @@ import (
 type AuthServiceInterface interface {
 	Logout(userId string, uuid string) error
 	RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error)
-	RegisterUser(user request.RegisterRequest) error
-	SignIn(user request.LoginRequest, params request.LoginParams) (response.Tokens, error)
+	RegisterUser(user request.RegisterRequest) (string, error)
+	SignInWithoutCode(user request.LoginRequest, params request.LoginParams) (response.Tokens, error)
 }
 
 type AuthHandler struct {
@@ -34,13 +34,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		WrapError(c, err)
 		return
 	}
-	err = h.service.RegisterUser(user)
+	link, err := h.service.RegisterUser(user)
 	if err != nil {
 		WrapError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"result": "user created",
+		"link":   link,
 	})
 }
 
@@ -60,16 +61,22 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 		LastIp:    ip,
 	}
 
-	tokens, err := h.service.SignIn(req, params)
+	tokens, err := h.service.SignInWithoutCode(req, params)
 	if err != nil {
 		WrapError(c, err)
 		return
 	}
 
+	// return succsesfull or not
+
 	c.JSON(http.StatusOK, response.Tokens{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	})
+}
+
+func (h *AuthHandler) ConfirmLogin(c *gin.Context) {
+
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
