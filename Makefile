@@ -100,6 +100,13 @@ db-backup:
 db-restore:
 	@echo "Usage: docker-compose exec -T postgres psql -U user db < your_backup_file.sql"
 
+db-clean:
+	@echo "WARNING: This will completely clean the database!"
+	@read -p "Are you sure? (y/N): " confirm && [ $${confirm:-N} = y ] || exit 1
+	docker-compose exec postgres psql -U user -d db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	@echo "Database cleaned successfully"
+
+db-reset: up-build db-clean down
 # Test commands
 test:
 	@echo "Running tests..."
