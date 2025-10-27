@@ -15,6 +15,8 @@ type AuthServiceInterface interface {
 	RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error)
 	RegisterUser(user request.RegisterRequest) (string, error)
 	SignInWithoutCode(user request.LoginRequest, params request.LoginParams) (response.Tokens, error)
+	SignIn(user request.LoginRequest, params request.LoginParams) (uint, error)
+	VerifyCode(req request.VerifyCodeRequest, params request.LoginParams) (response.Tokens, error)
 }
 
 type AuthHandler struct {
@@ -61,22 +63,44 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 		LastIp:    ip,
 	}
 
-	tokens, err := h.service.SignInWithoutCode(req, params)
+	id, err := h.service.SignIn(req, params)
 	if err != nil {
 		WrapError(c, err)
 		return
 	}
 
-	// return succsesfull or not
+	c.JSON(http.StatusOK, gin.H{
+		"user_id": id,
+	})
+}
+
+func (h *AuthHandler) VerifyLogin(c *gin.Context) {
+	var req request.VerifyCodeRequest
+
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	userAgent := c.Request.UserAgent()
+	ip := c.ClientIP()
+
+	params := request.LoginParams{
+		UserAgent: userAgent,
+		LastIp:    ip,
+	}
+
+	tokens, err := h.service.VerifyCode(req, params)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
 
 	c.JSON(http.StatusOK, response.Tokens{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	})
-}
-
-func (h *AuthHandler) ConfirmLogin(c *gin.Context) {
-
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {

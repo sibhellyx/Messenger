@@ -14,22 +14,22 @@ import (
 
 type AuthServiceInterface interface {
 	Activate(tgName string) error
+	GetTokenFromRedis(token string) (string, error)
+	DeleteRegistrationTokenFromRedis(token string) error
 }
 
 type Bot struct {
-	Api               *tgbotapi.BotAPI
-	actions           map[string]ActionFunc // for handle start action
-	RegistratingUsers map[string]string
-	Service           AuthServiceInterface
+	Api     *tgbotapi.BotAPI
+	actions map[string]ActionFunc // for handle start action
+	Service AuthServiceInterface
 }
 
 type ActionFunc func(ctx context.Context, bot *Bot, update *tgbotapi.Update) error
 
 func NewBot(api *tgbotapi.BotAPI, service AuthServiceInterface) *Bot {
 	return &Bot{
-		Api:               api,
-		Service:           service,
-		RegistratingUsers: make(map[string]string),
+		Api:     api,
+		Service: service,
 	}
 }
 
@@ -40,15 +40,10 @@ func (b *Bot) RegisterAction(nameAction string, action ActionFunc) {
 	b.actions[nameAction] = action
 }
 
-func SendUserToRegister() {
-
-}
-
-func (b *Bot) GetLinkForFinishRegister(tgName string) string {
+func (b *Bot) GetLinkForFinishRegister(tgName string) (string, string) {
 	slog.Debug("sending link for user", "tgName", tgName)
 	token := uuid.New().String()
-	b.RegistratingUsers[token] = tgName
-	return fmt.Sprintf("https://t.me/%s?start=invite_%s", b.Api.Self.UserName, token)
+	return token, fmt.Sprintf("https://t.me/%s?start=invite_%s", b.Api.Self.UserName, token)
 }
 
 func (b *Bot) Run(ctx context.Context) error {
@@ -65,7 +60,6 @@ func (b *Bot) Run(ctx context.Context) error {
 			updateCancel()
 		case <-ctx.Done():
 			return ctx.Err()
-			// add case for registration
 		}
 	}
 }
@@ -96,4 +90,28 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) {
 		}
 	}
 
+}
+
+func (b *Bot) SendCode(code, tgName string) error {
+	message := fmt.Sprintf(
+		"🔐 *Код подтверждения*\n\n"+
+			"Ваш код для входа: `%s`\n\n"+
+			"⚠️ *Никому не сообщайте этот код!*\n"+
+			"⏳ Код действителен в течение 10 минут",
+		code,
+	)
+
+	msg := tgbotapi.NewMessageToChannel("@"+tgName, message)
+	msg.ParseMode = "Markdown"
+
+	_, err := b.Api.Send(msg)
+	if err != nil {
+		slog.Error("failed to send verification code",
+			"error", err, "tgname", tgName, "code", code)
+		return fmt.Errorf("failed to send verification code to %s: %w", tgName, err)
+	}
+
+	slog.Info("verification code sent successfully",
+		"tgname", tgName, "code", code)
+	return nil
 }

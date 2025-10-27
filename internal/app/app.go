@@ -17,6 +17,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
 	"github.com/sibhellyx/Messenger/internal/db/msgrepo"
 	"github.com/sibhellyx/Messenger/internal/kafka"
+	redispkg "github.com/sibhellyx/Messenger/internal/redis"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
 	messageservice "github.com/sibhellyx/Messenger/internal/services/messageService"
@@ -65,6 +66,14 @@ func (srv *Server) Serve() {
 	}
 	srv.db = database
 
+	redisClient := redispkg.NewClient(srv.cfg.Redis)
+	if err := redisClient.Connect(srv.ctx); err != nil {
+		slog.Error("failed to connect to Redis", "error", err)
+		return
+	}
+	defer redisClient.Close()
+	redisRepo := redispkg.NewRedisRepository(redisClient)
+
 	// migration database
 	slog.Debug("do migration to database")
 	err = migrate.Migrate(srv.db)
@@ -102,6 +111,7 @@ func (srv *Server) Serve() {
 		authRepository,
 		hasher,
 		manager,
+		redisRepo,
 		time.Duration(srv.cfg.Jwt.AccessTTL*int(time.Minute)),
 		time.Duration(srv.cfg.Jwt.RefreshTTL*int(time.Hour*24)),
 		srv.cfg.Jwt.ActiveSessions,

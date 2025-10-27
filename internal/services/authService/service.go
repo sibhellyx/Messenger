@@ -12,6 +12,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/models/payload"
 	"github.com/sibhellyx/Messenger/internal/models/request"
 	"github.com/sibhellyx/Messenger/internal/models/response"
+	"github.com/sibhellyx/Messenger/pkg/auth"
 )
 
 type RepositoryInterface interface {
@@ -41,7 +42,14 @@ type TokenManagerInterface interface {
 }
 
 type BotServiceInterface interface {
-	GetLinkForFinishRegister(tgName string) string
+	GetLinkForFinishRegister(tgName string) (string, string)
+	SendCode(code, tgName string) error
+}
+
+type RedisRepositoryInterface interface {
+	SaveRegistrationToken(token, tgName string, ttl time.Duration) error
+	GetRegistrationToken(token string) (string, error)
+	DeleteRegistrationToken(token string) error
 }
 
 type AuthService struct {
@@ -50,16 +58,20 @@ type AuthService struct {
 	hasher       HasherInterface
 	tokenManager TokenManagerInterface
 	bot          BotServiceInterface
+	redis        RedisRepositoryInterface
 
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
 	activeSessions  int
+
+	storage map[uint]string // some cash for codes of user login, in future must relise package for cash
 }
 
 func NewAuthService(
 	repository RepositoryInterface,
 	hasher HasherInterface,
 	manager TokenManagerInterface,
+	redis RedisRepositoryInterface,
 	accessTokenTTL, refreshTokenTTL time.Duration,
 	activeSessions int,
 ) *AuthService {
@@ -67,9 +79,11 @@ func NewAuthService(
 		repository:      repository,
 		hasher:          hasher,
 		tokenManager:    manager,
+		redis:           redis,
 		accessTokenTTL:  accessTokenTTL,
 		refreshTokenTTL: refreshTokenTTL,
 		activeSessions:  activeSessions,
+		storage:         make(map[uint]string),
 	}
 }
 
@@ -104,10 +118,28 @@ func (s *AuthService) RegisterUser(r request.RegisterRequest) (string, error) {
 		return "", err
 	}
 	// send to bot this user TgName and get link for register
-	link := s.bot.GetLinkForFinishRegister(r.Tgname)
+	token, link := s.bot.GetLinkForFinishRegister(r.Tgname)
+	// save to reddis user
+	err = s.redis.SaveRegistrationToken(token, r.Tgname, 2*time.Minute)
+	if err != nil {
+		slog.Error("failed save user in repo for checking tokens of registration", "error", err)
+		return "", errors.New("failed save user")
+	}
+
+	// need add clear not actived users
+	// - add time for link
+	// - add clearing not active users after for example five minuts of register
 
 	slog.Debug("service register completed")
 	return link, nil
+}
+
+func (s *AuthService) GetTokenFromRedis(token string) (string, error) {
+	return s.redis.GetRegistrationToken(token)
+}
+
+func (s *AuthService) DeleteRegistrationTokenFromRedis(token string) error {
+	return s.redis.DeleteRegistrationToken(token)
 }
 
 // activate user account after start tg bot
@@ -143,9 +175,7 @@ func (s *AuthService) SignInWithoutCode(user request.LoginRequest, params reques
 
 	if !s.hasher.ComparePassword(u.Password, user.Password) {
 		slog.Error("invalid password", "tgname", user.Tgname)
-		// return false and error
 		return response.Tokens{}, errors.New("invalid credentials")
-
 	}
 
 	return s.createSession(u.ID, params)
@@ -167,14 +197,50 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 
 	if !s.hasher.ComparePassword(u.Password, user.Password) {
 		slog.Error("invalid password", "tgname", user.Tgname)
-		// return false and error
 		return 0, errors.New("invalid credentials")
-
 	}
-	// return that now need input code from tg
-	// generate code and send it in telegram to user
-	// return userID and nil
+
+	// add checking active user or no
+	if !u.IsActive {
+		slog.Error("user not activated", "tgName", u.Tgname)
+		return 0, errors.New("user not activated, please activate account")
+	}
+
+	// generate code for verify login
+	code := auth.GenerateLoginCode()
+	// sending code in telegram
+	err = s.bot.SendCode(code, u.Tgname)
+	if err != nil {
+		slog.Error("failed send code to user", "id", u.ID, "tgName", u.Tgname)
+		return 0, errors.New("failed send code, try again later")
+	}
+	// save code in storage for check
+	s.storage[u.ID] = code
 	return u.ID, nil
+}
+
+func (s *AuthService) VerifyCode(req request.VerifyCodeRequest, params request.LoginParams) (response.Tokens, error) {
+	slog.Debug("service of veryficate code started")
+	err := req.Validate()
+	if err != nil {
+		slog.Error("error validating user input", "error", err.Error())
+		return response.Tokens{}, err
+	}
+	id, err := strconv.ParseUint(req.UserID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", req.UserID)
+		return response.Tokens{}, errors.New("user_id incorrect")
+	}
+
+	// check exist this user in logining
+	codeFromStorage, exist := s.storage[uint(id)]
+	if !exist || codeFromStorage != req.Code {
+		slog.Error("user not exist in storage of logining and code or code incorrect")
+		return response.Tokens{}, errors.New("code incorrect")
+	}
+
+	slog.Debug("service of veryficate code completed")
+	return s.createSession(uint(id), params)
 }
 
 func (s *AuthService) RefreshToken(payload payload.PayloadForRefresh, params request.LoginParams) (response.Tokens, error) {

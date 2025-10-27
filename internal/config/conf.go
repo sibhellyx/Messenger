@@ -27,6 +27,13 @@ type DbConfig struct {
 	DBpassword string `mapstructure:"DB_PASS"`
 }
 
+type RedisConfig struct {
+	Host     string `mapstructure:"REDIS_HOST"`
+	Port     string `mapstructure:"REDIS_PORT"`
+	Password string `mapstructure:"REDIS_PASSWORD"`
+	DB       int    `mapstructure:"REDIS_DB"`
+}
+
 type AuthConfig struct {
 	Salt       string `mapstructure:"SALT"`        // salt for hash
 	SigningKey string `mapstructure:"SIGNING_KEY"` // signing key for auth manager
@@ -78,6 +85,7 @@ type Config struct {
 	Bot   BotConfig
 	Srv   ServerConfig
 	Db    DbConfig
+	Redis RedisConfig
 	Jwt   JwtConfig
 	Auth  AuthConfig
 	Ws    WsConfig
@@ -146,6 +154,9 @@ func LoadConfig() (Config, error) {
 	if err := v.Unmarshal(&cfg.Db); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal database config: %w", err)
 	}
+	if err := v.Unmarshal(&cfg.Redis); err != nil {
+		return Config{}, fmt.Errorf("failed to unmarshal redis config: %w", err)
+	}
 	if err := v.Unmarshal(&cfg.Auth); err != nil {
 		return Config{}, fmt.Errorf("failed to unmarshal auth config: %w", err)
 	}
@@ -203,6 +214,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("DB_HOST", "localhost")
 	v.SetDefault("DB_PORT", "5432")
 	v.SetDefault("DB_PASS", "password")
+
+	v.SetDefault("REDIS_HOST", "localhost")
+	v.SetDefault("REDIS_PORT", "6379")
+	v.SetDefault("REDIS_PASSWORD", "redispassword")
+	v.SetDefault("REDIS_DB", 0)
 
 	// Authentication defaults
 	v.SetDefault("SALT", "salt")

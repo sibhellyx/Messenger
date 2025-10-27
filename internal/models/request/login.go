@@ -15,6 +15,11 @@ type LoginParams struct {
 	LastIp    string
 }
 
+type VerifyCodeRequest struct {
+	UserID string `json:"user_id"`
+	Code   string `json:"code"`
+}
+
 func (l LoginRequest) Validate() error {
 	slog.Debug("validating login input")
 	if l.Tgname == "" {
@@ -26,5 +31,18 @@ func (l LoginRequest) Validate() error {
 		return errors.New("password is required")
 	}
 	slog.Debug("validating login input completed")
+	return nil
+}
+
+func (r VerifyCodeRequest) Validate() error {
+	slog.Debug("validating verify code request")
+	if r.Code == "" {
+		slog.Error("code is required")
+		return errors.New("code is required")
+	}
+	if r.UserID == "" {
+		slog.Error("user_id is required")
+		return errors.New("user_id is required")
+	}
 	return nil
 }

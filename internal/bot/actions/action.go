@@ -12,34 +12,30 @@ import (
 
 func HandleStart() bot.ActionFunc {
 	return func(ctx context.Context, bot *bot.Bot, update *tgbotapi.Update) error {
-		slog.Debug("start action handling")
+		slog.Debug("start action han")
 		if update.Message == nil {
 			return nil
 		}
 
-		// Получаем аргументы команды /start
 		commandArgs := update.Message.CommandArguments()
 
 		if !strings.HasPrefix(commandArgs, "invite_") {
-			// Если это обычная команда /start без инвайта
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Добро пожаловать! Для регистрации используйте ссылку-приглашение.")
 			_, err := bot.Api.Send(msg)
 			return err
 		}
 
-		// Извлекаем токен из аргументов
 		token := strings.TrimPrefix(commandArgs, "invite_")
 
-		// Ищем tgName по токену в карте регистрирующихся пользователей
-		tgName, exists := bot.RegistratingUsers[token]
-		if !exists {
+		tgName, err := bot.Service.GetTokenFromRedis(token)
+		if err != nil {
+			slog.Error("failed find user by token in redis repo", "error", err)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверная или устаревшая ссылка приглашения. Запросите новую ссылку.")
 			_, err := bot.Api.Send(msg)
 			return err
 		}
 
-		// Активируем пользователя через сервис
-		err := bot.Service.Activate(tgName)
+		err = bot.Service.Activate(tgName)
 		if err != nil {
 			slog.Error("failed to activate user", "error", err, "tgname", tgName)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка активации аккаунта. Обратитесь к администратору.")
@@ -50,10 +46,12 @@ func HandleStart() bot.ActionFunc {
 			return err
 		}
 
-		// Удаляем использованный токен из карты
-		delete(bot.RegistratingUsers, token)
+		err = bot.Service.DeleteRegistrationTokenFromRedis(token)
+		if err != nil {
+			slog.Error("failed delete token from redis repo", "error", err)
+			return err
+		}
 
-		// Отправляем сообщение об успешной активации
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Ваш аккаунт успешно активирован! Теперь вы можете войти в систему.")
 		_, err = bot.Api.Send(msg)
 		if err != nil {
