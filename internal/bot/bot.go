@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,9 +14,11 @@ import (
 )
 
 type AuthServiceInterface interface {
-	Activate(tgName string) error
+	Activate(tgName string) (uint, error)
 	GetTokenFromRedis(token string) (string, error)
 	DeleteRegistrationTokenFromRedis(token string) error
+	SaveUserRegistration(userId uint, tgChatId int64) error
+	GetUserRegistration(userID uint) (int64, error)
 }
 
 type Bot struct {
@@ -92,7 +95,14 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) {
 
 }
 
-func (b *Bot) SendCode(code, tgName string) error {
+func (b *Bot) SendCode(code string, userId uint) error {
+	// Получаем chat ID пользователя из Redis
+	chatID, err := b.Service.GetUserRegistration(userId)
+	if err != nil {
+		slog.Error("failed to get user chat ID", "user_id", userId, "error", err)
+		return errors.New("failed find user, not active profile")
+	}
+
 	message := fmt.Sprintf(
 		"🔐 *Код подтверждения*\n\n"+
 			"Ваш код для входа: `%s`\n\n"+
@@ -101,17 +111,17 @@ func (b *Bot) SendCode(code, tgName string) error {
 		code,
 	)
 
-	msg := tgbotapi.NewMessageToChannel("@"+tgName, message)
+	msg := tgbotapi.NewMessage(chatID, message)
 	msg.ParseMode = "Markdown"
 
-	_, err := b.Api.Send(msg)
+	_, err = b.Api.Send(msg)
 	if err != nil {
 		slog.Error("failed to send verification code",
-			"error", err, "tgname", tgName, "code", code)
-		return fmt.Errorf("failed to send verification code to %s: %w", tgName, err)
+			"error", err, "user_id", userId, "chat_id", chatID, "code", code)
+		return fmt.Errorf("failed to send verification code to user %d (chat %d): %w", userId, chatID, err)
 	}
 
 	slog.Info("verification code sent successfully",
-		"tgname", tgName, "code", code)
+		"user_id", userId, "chat_id", chatID, "code", code)
 	return nil
 }

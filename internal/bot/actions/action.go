@@ -35,7 +35,7 @@ func HandleStart() bot.ActionFunc {
 			return err
 		}
 
-		err = bot.Service.Activate(tgName)
+		id, err := bot.Service.Activate(tgName)
 		if err != nil {
 			slog.Error("failed to activate user", "error", err, "tgname", tgName)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка активации аккаунта. Обратитесь к администратору.")
@@ -57,6 +57,8 @@ func HandleStart() bot.ActionFunc {
 		if err != nil {
 			return err
 		}
+
+		bot.Service.SaveUserRegistration(id, update.Message.Chat.ID)
 
 		slog.Info("user activated successfully via bot", "tgname", tgName, "chat_id", update.Message.Chat.ID)
 		return nil
