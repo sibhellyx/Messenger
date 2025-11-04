@@ -35,6 +35,14 @@ func HandleStart() bot.ActionFunc {
 			return err
 		}
 
+		// add checki tg name from redis and now user from tg
+		if tgName != update.Message.From.UserName {
+			slog.Error("failed find user by token in redis repo", "error", err)
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверная или устаревшая ссылка приглашения. Запросите новую ссылку.")
+			_, err := bot.Api.Send(msg)
+			return err
+		}
+
 		id, err := bot.Service.Activate(tgName)
 		if err != nil {
 			slog.Error("failed to activate user", "error", err, "tgname", tgName)
