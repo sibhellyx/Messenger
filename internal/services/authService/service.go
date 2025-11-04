@@ -107,6 +107,12 @@ func (s *AuthService) RegisterUser(r request.RegisterRequest) (string, error) {
 		slog.Error("failed hash password", "error", err.Error())
 		return "", err
 	}
+
+	u, err := s.repository.GetUserByTgname(r.Tgname)
+	if err == nil || u != nil {
+		slog.Error("this user is already registered")
+		return "", errors.New("this user is already registered")
+	}
 	// create user
 	user := entity.User{
 		Name:     r.Name,
@@ -114,6 +120,7 @@ func (s *AuthService) RegisterUser(r request.RegisterRequest) (string, error) {
 		Tgname:   r.Tgname,
 		Password: r.Password,
 	}
+
 	// send to bot this user name and get link for register
 	token, link := s.bot.GetLinkForFinishRegister(r.Tgname)
 	// save to reddis user
