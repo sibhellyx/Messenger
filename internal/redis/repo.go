@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/sibhellyx/Messenger/internal/models/entity"
 )
 
 type RedisRepository struct {
@@ -21,14 +22,32 @@ func NewRedisRepository(client *Client) *RedisRepository {
 	}
 }
 
-func (r *RedisRepository) SaveRegistrationToken(token, tgName string, ttl time.Duration) error {
+func (r *RedisRepository) SaveRegistrationToken(token string, user entity.User, ttl time.Duration) error {
 	key := fmt.Sprintf("registration:%s", token)
-	return r.client.client.Set(r.ctx, key, tgName, ttl).Err()
+
+	// Сериализуем пользователя в JSON
+	userJSON, err := json.Marshal(user)
+	if err != nil {
+		return fmt.Errorf("failed to marshal user to JSON: %w", err)
+	}
+
+	return r.client.client.Set(r.ctx, key, userJSON, ttl).Err()
 }
 
-func (r *RedisRepository) GetRegistrationToken(token string) (string, error) {
+func (r *RedisRepository) GetRegistrationToken(token string) (entity.User, error) {
 	key := fmt.Sprintf("registration:%s", token)
-	return r.client.client.Get(r.ctx, key).Result()
+
+	data, err := r.client.client.Get(r.ctx, key).Result()
+	if err != nil {
+		return entity.User{}, err
+	}
+
+	var user entity.User
+	if err := json.Unmarshal([]byte(data), &user); err != nil {
+		return entity.User{}, fmt.Errorf("failed to unmarshal user from JSON: %w", err)
+	}
+
+	return user, nil
 }
 
 func (r *RedisRepository) DeleteRegistrationToken(token string) error {

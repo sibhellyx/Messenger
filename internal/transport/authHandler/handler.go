@@ -42,8 +42,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"result": "user created",
-		"link":   link,
+		"link": link,
 	})
 }
 

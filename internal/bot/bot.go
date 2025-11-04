@@ -11,11 +11,12 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
+	"github.com/sibhellyx/Messenger/internal/models/entity"
 )
 
 type AuthServiceInterface interface {
-	Activate(tgName string) (uint, error)
-	GetTokenFromRedis(token string) (string, error)
+	Activate(entity.User) (uint, error)
+	GetTokenFromRedis(token string) (entity.User, error)
 	DeleteRegistrationTokenFromRedis(token string) error
 	SaveUserRegistration(userId uint, tgChatId int64) error
 	GetUserRegistration(userID uint) (int64, error)
@@ -44,7 +45,7 @@ func (b *Bot) RegisterAction(nameAction string, action ActionFunc) {
 }
 
 func (b *Bot) GetLinkForFinishRegister(tgName string) (string, string) {
-	slog.Debug("sending link for user", "tgName", tgName)
+	slog.Debug("sending link for user", "name", tgName)
 	token := uuid.New().String()
 	return token, fmt.Sprintf("https://t.me/%s?start=invite_%s", b.Api.Self.UserName, token)
 }

@@ -27,7 +27,7 @@ func HandleStart() bot.ActionFunc {
 
 		token := strings.TrimPrefix(commandArgs, "invite_")
 
-		tgName, err := bot.Service.GetTokenFromRedis(token)
+		user, err := bot.Service.GetTokenFromRedis(token)
 		if err != nil {
 			slog.Error("failed find user by token in redis repo", "error", err)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверная или устаревшая ссылка приглашения. Запросите новую ссылку.")
@@ -36,16 +36,16 @@ func HandleStart() bot.ActionFunc {
 		}
 
 		// add checki tg name from redis and now user from tg
-		if tgName != update.Message.From.UserName {
+		if user.Tgname != update.Message.From.UserName {
 			slog.Error("failed find user by token in redis repo", "error", err)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверная или устаревшая ссылка приглашения. Запросите новую ссылку.")
 			_, err := bot.Api.Send(msg)
 			return err
 		}
 
-		id, err := bot.Service.Activate(tgName)
+		id, err := bot.Service.Activate(user)
 		if err != nil {
-			slog.Error("failed to activate user", "error", err, "tgname", tgName)
+			slog.Error("failed to activate user", "error", err, "tgname", user.Tgname)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка активации аккаунта. Обратитесь к администратору.")
 			_, sendErr := bot.Api.Send(msg)
 			if sendErr != nil {
@@ -68,7 +68,7 @@ func HandleStart() bot.ActionFunc {
 
 		bot.Service.SaveUserRegistration(id, update.Message.Chat.ID)
 
-		slog.Info("user activated successfully via bot", "tgname", tgName, "chat_id", update.Message.Chat.ID)
+		slog.Info("user activated successfully via bot", "tgname", user.Tgname, "chat_id", update.Message.Chat.ID)
 		return nil
 	}
 }

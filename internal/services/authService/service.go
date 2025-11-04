@@ -18,6 +18,7 @@ import (
 type RepositoryInterface interface {
 	CreateSession(session entity.Session) error
 	CreateUser(user entity.User) error
+	CreateUserAndGetId(user entity.User) (uint, error)
 	DeleteSessionByUuid(uuid string) error
 	FindJwtSessionByUuidAndRefreshToken(uuid string, refreshToken string) (*entity.Session, error)
 	GetUserByCredentails(tgname string, password string) (*entity.User, error)
@@ -47,8 +48,8 @@ type BotServiceInterface interface {
 }
 
 type RedisRepositoryInterface interface {
-	SaveRegistrationToken(token, tgName string, ttl time.Duration) error
-	GetRegistrationToken(token string) (string, error)
+	SaveRegistrationToken(token string, user entity.User, ttl time.Duration) error
+	GetRegistrationToken(token string) (entity.User, error)
 	DeleteRegistrationToken(token string) error
 	SaveLoginCode(userID uint, code string, ttl time.Duration) error
 	GetLoginCode(userID uint) (string, error)
@@ -106,37 +107,27 @@ func (s *AuthService) RegisterUser(r request.RegisterRequest) (string, error) {
 		slog.Error("failed hash password", "error", err.Error())
 		return "", err
 	}
-
-	// write repo
-	err = s.repository.CreateUser(entity.User{
+	// create user
+	user := entity.User{
 		Name:     r.Name,
 		Surname:  r.Surname,
 		Tgname:   r.Tgname,
 		Password: r.Password,
-		IsActive: false,
-	})
-	if err != nil {
-		slog.Error("failed create user in repo", "error", err.Error())
-		return "", err
 	}
-	// send to bot this user TgName and get link for register
+	// send to bot this user name and get link for register
 	token, link := s.bot.GetLinkForFinishRegister(r.Tgname)
 	// save to reddis user
-	err = s.redis.SaveRegistrationToken(token, r.Tgname, 2*time.Minute)
+	err = s.redis.SaveRegistrationToken(token, user, 5*time.Minute)
 	if err != nil {
 		slog.Error("failed save user in repo for checking tokens of registration", "error", err)
 		return "", errors.New("failed save user")
 	}
 
-	// need add clear not actived users
-	// - add time for link
-	// - add clearing not active users after for example five minuts of register
-
 	slog.Debug("service register completed")
 	return link, nil
 }
 
-func (s *AuthService) GetTokenFromRedis(token string) (string, error) {
+func (s *AuthService) GetTokenFromRedis(token string) (entity.User, error) {
 	return s.redis.GetRegistrationToken(token)
 }
 
@@ -153,20 +144,15 @@ func (s *AuthService) GetUserRegistration(userID uint) (int64, error) {
 }
 
 // activate user account after start tg bot
-func (s *AuthService) Activate(tgName string) (uint, error) {
-	slog.Debug("activating user", "tgName", tgName)
-	user, err := s.repository.GetUserByTgname(tgName)
+func (s *AuthService) Activate(user entity.User) (uint, error) {
+	slog.Debug("activating user", "tgName", user.Tgname)
+	id, err := s.repository.CreateUserAndGetId(user)
 	if err != nil {
-		slog.Error("failed get user", "error", err)
-		return 0, errors.New("failed get user")
+		slog.Error("failed create user", "tgName", user.Tgname)
+		return 0, err
 	}
-	err = s.repository.ActivateUser(user.ID)
-	if err != nil {
-		slog.Error("failed activate user", "error", err)
-		return 0, errors.New("failed activate user")
-	}
-	slog.Debug("activating user completed", "tgName", tgName)
-	return user.ID, nil
+	slog.Debug("activating user completed", "tgName", user.Tgname)
+	return id, nil
 }
 
 func (s *AuthService) SignInWithoutCode(user request.LoginRequest, params request.LoginParams) (response.Tokens, error) {
@@ -208,12 +194,6 @@ func (s *AuthService) SignIn(user request.LoginRequest, params request.LoginPara
 	if !s.hasher.ComparePassword(u.Password, user.Password) {
 		slog.Error("invalid password", "tgname", user.Tgname)
 		return 0, errors.New("invalid credentials")
-	}
-
-	// add checking active user or no
-	if !u.IsActive {
-		slog.Error("user not activated", "tgName", u.Tgname)
-		return 0, errors.New("user not activated, please activate account")
 	}
 
 	// generate code for verify login

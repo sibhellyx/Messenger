@@ -28,8 +28,21 @@ func (r *AuthRepository) CreateUser(user entity.User) error {
 		return errors.New("failed create user")
 	}
 
-	slog.Info("user created successfully", "user_id", user.ID, "email", user.Tgname)
+	slog.Info("user created successfully", "user_id", user.ID, "tgname", user.Tgname)
 	return nil
+}
+
+func (r *AuthRepository) CreateUserAndGetId(user entity.User) (uint, error) {
+	slog.Debug("creating user", "tgname", user.Tgname)
+
+	result := r.db.Create(&user)
+	if result.Error != nil {
+		slog.Error("failed to create user", "error", result.Error, "tgname", user.Tgname)
+		return 0, errors.New("failed create user")
+	}
+
+	slog.Info("user created successfully", "user_id", user.ID, "tgname", user.Tgname)
+	return user.ID, nil
 }
 
 func (r *AuthRepository) GetUserByCredentails(tgname, password string) (*entity.User, error) {
