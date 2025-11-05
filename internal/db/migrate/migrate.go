@@ -15,6 +15,7 @@ func Migrate(db *gorm.DB) error {
 		tableName string
 	}{
 		{&entity.User{}, "users"},
+		{&entity.UserProfile{}, "profiles"},
 		{&entity.Session{}, "sessions"},
 		{&entity.Chat{}, "chats"},
 		{&entity.Message{}, "messages"},
