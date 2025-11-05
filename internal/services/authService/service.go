@@ -27,7 +27,7 @@ type RepositoryInterface interface {
 	DeleteOldestSession(userId uint) error
 	GetUserByTgname(tgname string) (*entity.User, error)
 	CountActiveSessions(userId uint) (int64, error)
-	ActivateUser(userId uint) error
+	CreateProfile(profile entity.UserProfile) error
 }
 
 type HasherInterface interface {
@@ -157,6 +157,16 @@ func (s *AuthService) Activate(user entity.User) (uint, error) {
 	if err != nil {
 		slog.Error("failed create user", "tgName", user.Tgname)
 		return 0, err
+	}
+	profile := entity.UserProfile{
+		UserID:      id,
+		Bio:         "",
+		Avatar:      "",
+		DateOfBirth: nil,
+	}
+	err = s.repository.CreateProfile(profile)
+	if err != nil {
+		slog.Error("failed create profile for user", "tgName", user.Tgname)
 	}
 	slog.Debug("activating user completed", "tgName", user.Tgname)
 	return id, nil

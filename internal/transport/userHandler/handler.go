@@ -1,15 +1,21 @@
 package userhandler
 
 import (
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
+	"github.com/sibhellyx/Messenger/internal/models/request"
+	"github.com/sibhellyx/Messenger/internal/models/response"
 )
 
 type UserServiceInterface interface {
 	GetUsers(search string) ([]*entity.User, error)
+	UpdateProfile(userId string, req request.ProfileRequest) error
+	GetFullInfoAboutUser(userID string) (*response.UserWithProfile, error)
 }
 
 type UserHandler struct {
@@ -20,6 +26,74 @@ func NewUserHandler(service UserServiceInterface) *UserHandler {
 	return &UserHandler{
 		service: service,
 	}
+}
+
+func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
+	userID, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req request.ProfileRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	err = h.service.UpdateProfile(userID.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"result": "ok",
+	})
+}
+
+func (h *UserHandler) GetUserProfile(c *gin.Context) {
+	userID, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	profileUserID := c.Param("user_id")
+	if profileUserID == "" || profileUserID == "me" {
+		profileUserID = userID.(string)
+	}
+
+	userInfo, err := h.service.GetFullInfoAboutUser(profileUserID)
+	if err != nil {
+		slog.Error("failed to get user profile", "error", err, "user_id", profileUserID)
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"profile": userInfo,
+	})
+}
+
+func (h *UserHandler) GetMyProfile(c *gin.Context) {
+	userID, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userInfo, err := h.service.GetFullInfoAboutUser(userID.(string))
+	if err != nil {
+		slog.Error("failed to get my profile", "error", err, "user_id", userID)
+		WrapError(c, err)
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"profile": userInfo,
+	})
 }
 
 func (h *UserHandler) GetUsers(c *gin.Context) {
@@ -76,5 +150,11 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 			"offset":   offset,
 			"has_more": end < total,
 		},
+	})
+}
+
+func WrapError(c *gin.Context, err error) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error": err.Error(),
 	})
 }

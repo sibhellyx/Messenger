@@ -32,6 +32,17 @@ func (r *AuthRepository) CreateUser(user entity.User) error {
 	return nil
 }
 
+func (r *AuthRepository) CreateProfile(profile entity.UserProfile) error {
+	result := r.db.Create(&profile)
+	if result.Error != nil {
+		slog.Error("failed to create user profile", "error", result.Error, "user_id", profile.UserID)
+		return errors.New("failed create user profile")
+	}
+
+	slog.Info("user profile created successfully", "user_id", profile.UserID, "profile_id", profile.ID)
+	return nil
+}
+
 func (r *AuthRepository) CreateUserAndGetId(user entity.User) (uint, error) {
 	slog.Debug("creating user", "tgname", user.Tgname)
 
