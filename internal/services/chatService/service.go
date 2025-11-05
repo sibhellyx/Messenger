@@ -53,6 +53,8 @@ type ChatRepositoryInterface interface {
 	ParticipantIsOwner(userID, chatID uint) bool
 	// check user for exist
 	UserExist(userID uint) bool
+	// get users
+	GetUsers(search string) ([]*entity.User, error)
 }
 
 type ChatService struct {
@@ -63,6 +65,21 @@ func NewChatService(repository ChatRepositoryInterface) *ChatService {
 	return &ChatService{
 		repository: repository,
 	}
+}
+
+func (s *ChatService) GetUsers(search string) ([]*entity.User, error) {
+	users, err := s.repository.GetUsers(search)
+	if err != nil {
+		slog.Error("failed to get users from repository", "error", err)
+		return nil, err
+	}
+
+	// Убедимся, что пароли не возвращаются (двойная защита)
+	for _, user := range users {
+		user.Password = ""
+	}
+
+	return users, nil
 }
 
 func (s *ChatService) CreateChat(userID string, req request.CreateChatRequest) (*entity.Chat, error) {
