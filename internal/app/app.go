@@ -16,15 +16,18 @@ import (
 	"github.com/sibhellyx/Messenger/internal/db/chatrepo"
 	"github.com/sibhellyx/Messenger/internal/db/migrate"
 	"github.com/sibhellyx/Messenger/internal/db/msgrepo"
+	"github.com/sibhellyx/Messenger/internal/db/userrepo"
 	"github.com/sibhellyx/Messenger/internal/kafka"
 	redispkg "github.com/sibhellyx/Messenger/internal/redis"
 	authservice "github.com/sibhellyx/Messenger/internal/services/authService"
 	chatservice "github.com/sibhellyx/Messenger/internal/services/chatService"
 	messageservice "github.com/sibhellyx/Messenger/internal/services/messageService"
+	userservice "github.com/sibhellyx/Messenger/internal/services/userService"
 	wsservice "github.com/sibhellyx/Messenger/internal/services/wsService"
 	authhandler "github.com/sibhellyx/Messenger/internal/transport/authHandler"
 	chathandler "github.com/sibhellyx/Messenger/internal/transport/chatHandler"
 	messagehandler "github.com/sibhellyx/Messenger/internal/transport/messageHandler"
+	userhandler "github.com/sibhellyx/Messenger/internal/transport/userHandler"
 	wshandler "github.com/sibhellyx/Messenger/internal/transport/wsHandler"
 	"github.com/sibhellyx/Messenger/internal/ws"
 	"github.com/sibhellyx/Messenger/pkg/auth"
@@ -104,6 +107,8 @@ func (srv *Server) Serve() {
 	chatRepository := chatrepo.NewChatRepository(srv.db)
 	slog.Debug("connecting to message repository")
 	messageRepository := msgrepo.NewMessageRepository(srv.db)
+	slog.Debug("connecting to users repository")
+	userRepository := userrepo.NewUserRepository(srv.db)
 
 	// init service for auth
 	slog.Debug("connecting to auth service")
@@ -130,6 +135,8 @@ func (srv *Server) Serve() {
 	wsService := wsservice.NewWsService(hub)
 	slog.Debug("connecting to message service")
 	messageService := messageservice.NewMessageService(wsService, producer, messageRepository, chatRepository)
+	slog.Debug("connecting to user service")
+	userService := userservice.NewUserService(userRepository)
 
 	slog.Debug("init kafka consumer")
 	consumer := kafka.NewConsumer(srv.cfg.Kafka, messageService)
@@ -151,10 +158,12 @@ func (srv *Server) Serve() {
 	wsHandler := wshandler.NewWsHandler(wsService)
 	slog.Debug("connecting to message handler")
 	messageHandler := messagehandler.NewMessageHandler(messageService)
+	slog.Debug("connecting to user handler")
+	userHandler := userhandler.NewUserHandler(userService)
 
 	//init routes for messanger
 	slog.Debug("creating routes")
-	routes := api.CreateRoutes(authHandler, chatHandler, wsHandler, messageHandler, manager, authRepository)
+	routes := api.CreateRoutes(authHandler, chatHandler, wsHandler, messageHandler, userHandler, manager, authRepository)
 
 	// create http server
 	slog.Debug("init server")

@@ -29,6 +29,9 @@ type ChatHandlerInterface interface {
 	LeaveChat(c *gin.Context)
 	RemoveParticipant(c *gin.Context)
 	UpdateParticipant(c *gin.Context)
+}
+
+type UserHandlerInterface interface {
 	GetUsers(c *gin.Context)
 }
 
@@ -42,6 +45,7 @@ func CreateRoutes(
 	chatHandler ChatHandlerInterface,
 	wsHandler WsHandlerInterface,
 	messageHandler MessageHandlerInterface,
+	userHandler UserHandlerInterface,
 	m middleware.JwtManagerInterface,
 	repo middleware.SessionRepositoryInterface,
 ) *gin.Engine {
@@ -74,7 +78,7 @@ func CreateRoutes(
 	r.GET("/chat/messages", middleware.AuthMiddleware(m, repo), messageHandler.GetMessages)
 
 	// get users
-	r.GET("/users", middleware.AuthMiddleware(m, repo), chatHandler.GetUsers)
+	r.GET("/users", middleware.AuthMiddleware(m, repo), userHandler.GetUsers)
 	// ws handlers
 	r.GET("/connect", middleware.AuthMiddleware(m, repo), wsHandler.Connect)
 	return r
