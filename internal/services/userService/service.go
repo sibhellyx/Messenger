@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/request"
@@ -42,10 +43,16 @@ func (s *UserService) GetUsers(search string) ([]*entity.User, error) {
 }
 
 func (s *UserService) UpdateProfile(userID string, req request.ProfileRequest) error {
+	// Валидация userID
+	if userID == "" {
+		slog.Error("empty user_id provided")
+		return errors.New("user_id is required")
+	}
+
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
-		slog.Error("failed parse user_id to uint", "user_id", userID)
-		return errors.New("failed parse user_id")
+		slog.Error("failed parse user_id to uint", "user_id", userID, "err", err)
+		return errors.New("invalid user_id format")
 	}
 
 	err = req.Validate()
@@ -55,28 +62,72 @@ func (s *UserService) UpdateProfile(userID string, req request.ProfileRequest) e
 	}
 
 	user, err := s.repository.GetFullInfoAboutUser(uint(id))
-	if err != nil || user == nil {
-		slog.Error("failed found user", "user_id", user.UserID)
-		return err
+	if err != nil {
+		slog.Error("failed to get user", "user_id", id, "err", err)
+		return errors.New("user not found")
+	}
+	if user == nil {
+		slog.Error("user not found", "user_id", id)
+		return errors.New("user not found")
 	}
 
-	if user.Bio != req.Bio && req.Bio != "" {
+	updated := false
+
+	if req.Bio != "" && req.Bio != user.Bio {
 		user.Bio = req.Bio
+		updated = true
 	}
-	if user.Avatar != req.Avatar && req.Avatar != "" {
+
+	if req.Avatar != "" && req.Avatar != user.Avatar {
 		user.Avatar = req.Avatar
+		updated = true
 	}
-	if user.DateOfBirth != req.DateOfBirth && req.DateOfBirth != nil {
-		user.DateOfBirth = req.DateOfBirth
+
+	if req.DateOfBirth != "" {
+		data, err := req.ParsedDate()
+		if err != nil {
+			slog.Error("failed to parse date", "user_id", user.UserID, "err", err)
+			return errors.New("invalid date format")
+		}
+
+		currentDate := user.DateOfBirth
+		if !compareDates(currentDate, data) {
+			user.DateOfBirth = data
+			updated = true
+		}
 	}
+
+	if !updated {
+		slog.Info("no changes detected", "user_id", user.UserID)
+		return nil
+	}
+
 	profile := entity.UserProfile{
 		UserID:      uint(id),
-		Bio:         req.Bio,
-		Avatar:      req.Avatar,
-		DateOfBirth: req.DateOfBirth,
+		Bio:         user.Bio,
+		Avatar:      user.Avatar,
+		DateOfBirth: user.DateOfBirth,
 	}
 
-	return s.repository.UpdateProfile(profile)
+	err = s.repository.UpdateProfile(profile)
+	if err != nil {
+		slog.Error("failed to update profile", "user_id", user.UserID, "err", err)
+		return errors.New("failed to update profile")
+	}
+
+	slog.Info("profile updated successfully", "user_id", user.UserID)
+	return nil
+}
+
+func compareDates(date1, date2 *time.Time) bool {
+	// Оба nil - равны
+	if date1 == nil && date2 == nil {
+		return true
+	}
+	if (date1 == nil && date2 != nil) || (date1 != nil && date2 == nil) {
+		return false
+	}
+	return date1.Equal(*date2)
 }
 
 func (s *UserService) GetFullInfoAboutUser(userID string) (*response.UserWithProfile, error) {
