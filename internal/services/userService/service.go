@@ -43,7 +43,6 @@ func (s *UserService) GetUsers(search string) ([]*entity.User, error) {
 }
 
 func (s *UserService) UpdateProfile(userID string, req request.ProfileRequest) error {
-	// Валидация userID
 	if userID == "" {
 		slog.Error("empty user_id provided")
 		return errors.New("user_id is required")
@@ -73,27 +72,42 @@ func (s *UserService) UpdateProfile(userID string, req request.ProfileRequest) e
 
 	updated := false
 
-	if req.Bio != "" && req.Bio != user.Bio {
-		user.Bio = req.Bio
-		updated = true
-	}
-
-	if req.Avatar != "" && req.Avatar != user.Avatar {
-		user.Avatar = req.Avatar
-		updated = true
-	}
-
-	if req.DateOfBirth != "" {
-		data, err := req.ParsedDate()
-		if err != nil {
-			slog.Error("failed to parse date", "user_id", user.UserID, "err", err)
-			return errors.New("invalid date format")
-		}
-
-		currentDate := user.DateOfBirth
-		if !compareDates(currentDate, data) {
-			user.DateOfBirth = data
+	if req.Bio != nil {
+		if *req.Bio != user.Bio {
+			user.Bio = *req.Bio
 			updated = true
+			slog.Debug("bio updated", "user_id", user.UserID, "new_bio", *req.Bio)
+		}
+	}
+
+	if req.Avatar != nil {
+		if *req.Avatar != user.Avatar {
+			user.Avatar = *req.Avatar
+			updated = true
+			slog.Debug("avatar updated", "user_id", user.UserID, "new_avatar", *req.Avatar)
+		}
+	}
+
+	if req.DateOfBirth != nil {
+		if *req.DateOfBirth == "" {
+			if user.DateOfBirth != nil {
+				user.DateOfBirth = nil
+				updated = true
+				slog.Debug("date_of_birth cleared", "user_id", user.UserID)
+			}
+		} else {
+			data, err := req.ParsedDate()
+			if err != nil {
+				slog.Error("failed to parse date", "user_id", user.UserID, "err", err)
+				return errors.New("invalid date format")
+			}
+
+			currentDate := user.DateOfBirth
+			if !compareDates(currentDate, data) {
+				user.DateOfBirth = data
+				updated = true
+				slog.Debug("date_of_birth updated", "user_id", user.UserID, "new_date", data)
+			}
 		}
 	}
 
@@ -120,7 +134,6 @@ func (s *UserService) UpdateProfile(userID string, req request.ProfileRequest) e
 }
 
 func compareDates(date1, date2 *time.Time) bool {
-	// Оба nil - равны
 	if date1 == nil && date2 == nil {
 		return true
 	}

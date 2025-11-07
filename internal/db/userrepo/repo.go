@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/response"
@@ -40,20 +41,35 @@ func (r *UserRepository) GetUsers(search string) ([]*entity.User, error) {
 }
 
 func (r *UserRepository) UpdateProfile(profile entity.UserProfile) error {
-	result := r.db.Model(&entity.UserProfile{}).Where("user_id = ?", profile.UserID).Updates(profile)
+	updates := map[string]interface{}{
+		"avatar":        profile.Avatar,
+		"bio":           profile.Bio,
+		"date_of_birth": profile.DateOfBirth,
+	}
+
+	result := r.db.Model(&entity.UserProfile{}).
+		Where("user_id = ?", profile.UserID).
+		Updates(updates)
+
 	if result.Error != nil {
 		slog.Error("failed to update user profile", "error", result.Error, "user_id", profile.UserID)
 		return errors.New("failed update user profile")
 	}
 
 	if result.RowsAffected == 0 {
-		slog.Error("profile not found", "user_id", profile.UserID)
-		return errors.New("failed update profile, user not found")
+		profile.CreatedAt = time.Now()
+		profile.UpdatedAt = time.Now()
+		result = r.db.Create(&profile)
+		if result.Error != nil {
+			slog.Error("failed to create user profile", "error", result.Error, "user_id", profile.UserID)
+			return errors.New("failed to create user profile")
+		}
+		slog.Info("user profile created successfully", "user_id", profile.UserID)
+		return nil
 	}
 
 	slog.Info("user profile updated successfully", "user_id", profile.UserID)
 	return nil
-
 }
 
 func (r *UserRepository) GetUserById(userId uint) (*entity.User, error) {
@@ -81,10 +97,13 @@ func (r *UserRepository) GetFullInfoAboutUser(userId uint) (*response.UserWithPr
 				return nil, errors.New("failed get user by user_id")
 			}
 			return &response.UserWithProfile{
-				UserID:  user.ID,
-				Name:    user.Name,
-				Surname: user.Surname,
-				Tgname:  user.Tgname,
+				UserID:      user.ID,
+				Name:        user.Name,
+				Surname:     user.Surname,
+				Tgname:      user.Tgname,
+				Avatar:      "",
+				Bio:         "",
+				DateOfBirth: nil,
 			}, nil
 		}
 		slog.Error("failed to get user profile", "error", result.Error, "user_id", userId)
