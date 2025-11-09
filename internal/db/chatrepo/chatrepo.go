@@ -249,13 +249,19 @@ func (r *ChatRepository) FindChatsByName(name string) ([]*entity.Chat, error) {
 	return chats, nil
 }
 
-func (r *ChatRepository) GetChatParticipants(chatID uint) ([]*entity.ChatParticipant, error) {
+func (r *ChatRepository) GetChatParticipants(chatID uint, since *time.Time) ([]*entity.ChatParticipant, error) {
 	slog.Debug("getting chat participants", "chat_id", chatID)
 
 	var participants []*entity.ChatParticipant
 
-	err := r.db.
-		Where("chat_id = ? AND deleted_at IS NULL", chatID).
+	query := r.db.
+		Where("chat_id = ? AND deleted_at IS NULL", chatID)
+
+	if since != nil {
+		query = query.Where("created_at > ?", since)
+	}
+
+	err := query.Order("created_at ASC").
 		Find(&participants).Error
 
 	if err != nil {

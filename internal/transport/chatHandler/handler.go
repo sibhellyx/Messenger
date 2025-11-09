@@ -20,7 +20,7 @@ type ChatServiceInterface interface {
 	AddParticipant(userID string, req request.ParticipantRequest) error
 	RemoveParticipant(userID string, req request.ParticipantRequest) error
 	UpdateParticipant(userID string, req request.ParticipantUpdateRequest) error
-	GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error)
+	GetChatParticipants(chatID, sinceParam string) ([]*entity.ChatParticipant, error)
 	LeaveFromChat(chatID string, userID string) error
 }
 
@@ -220,6 +220,7 @@ func (h *ChatHandler) LeaveChat(c *gin.Context) {
 // get members of chat
 func (h *ChatHandler) GetChatParticipants(c *gin.Context) {
 	chatID := c.Query("id")
+	sinceParam := c.Query("since")
 
 	if chatID == "" {
 		WrapError(c, errors.New("id of chat required"))
@@ -231,7 +232,7 @@ func (h *ChatHandler) GetChatParticipants(c *gin.Context) {
 		return
 	}
 
-	particpants, err := h.service.GetChatParticipants(chatID)
+	particpants, err := h.service.GetChatParticipants(chatID, sinceParam)
 	if err != nil {
 		WrapError(c, err)
 		return

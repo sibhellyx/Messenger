@@ -1,6 +1,7 @@
 package chatservice
 
 import (
+	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -33,7 +34,7 @@ type ChatRepositoryInterface interface {
 	// geting chats by name searching
 	FindChatsByName(name string) ([]*entity.Chat, error)
 	// getting chat participants
-	GetChatParticipants(chatID uint) ([]*entity.ChatParticipant, error)
+	GetChatParticipants(chatID uint, since *time.Time) ([]*entity.ChatParticipant, error)
 	// delete user from chat
 	DeleteFromChat(chatID, userID uint) error
 	// get participant by chat_id and user_id
@@ -418,7 +419,24 @@ func (s *ChatService) addParticipant(chatID, userID uint, role entity.Participan
 	return s.repository.AddParticipant(participant)
 }
 
-func (s *ChatService) GetChatParticipants(chatID string) ([]*entity.ChatParticipant, error) {
+func (s *ChatService) GetChatParticipants(chatID, sinceParam string) ([]*entity.ChatParticipant, error) {
+	var since *time.Time
+	if sinceParam != "" {
+		parsedSince, parseErr := time.Parse(time.RFC3339, sinceParam)
+		if parseErr != nil {
+			timestamp, parseErr := strconv.ParseInt(sinceParam, 10, 64)
+			if parseErr != nil {
+				return nil, errors.New("invalid since parameter format, use RFC3339 or Unix timestamp")
+			}
+			parsedSince = time.Unix(timestamp, 0)
+		}
+
+		if parsedSince.After(time.Now()) {
+			return nil, errors.New("since parameter cannot be in the future")
+		}
+
+		since = &parsedSince
+	}
 	slog.Debug("getting chat participants", "chat_id", chatID)
 	chatId, err := strconv.ParseUint(chatID, 10, 32)
 	if err != nil {
@@ -431,7 +449,7 @@ func (s *ChatService) GetChatParticipants(chatID string) ([]*entity.ChatParticip
 		return nil, chaterrors.ErrChatNotFound
 	}
 
-	participants, err := s.repository.GetChatParticipants(uint(chatId))
+	participants, err := s.repository.GetChatParticipants(uint(chatId), since)
 	if err != nil {
 		return nil, chaterrors.ErrFailedGetParticipants
 	}
