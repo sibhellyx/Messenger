@@ -3,6 +3,7 @@ package chatrepo
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/models/chaterrors"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
@@ -333,25 +334,24 @@ func (r *ChatRepository) UpdateParticipant(participant *entity.ChatParticipant) 
 	return nil
 }
 
-func (r *ChatRepository) GetMessagesByChatId(chatID uint) ([]*entity.Message, error) {
-	slog.Debug("getting chat messages", "chat_id", chatID)
-
+func (r *ChatRepository) GetMessagesByChatId(chatId uint, since *time.Time) ([]*entity.Message, error) {
+	slog.Debug("get messages by chat_id", "chat_id", chatId, "since", since)
 	var messages []*entity.Message
 
-	err := r.db.
-		Where("chat_id = ? AND deleted_at IS NULL", chatID).
+	query := r.db.Where("chat_id = ? AND deleted_at IS NULL", chatId)
+
+	if since != nil {
+		query = query.Where("created_at > ?", since)
+	}
+
+	err := query.Order("created_at ASC").
 		Find(&messages).Error
 
 	if err != nil {
-		slog.Error("failed to get chat messages",
-			"chat_id", chatID,
-			"error", err)
-		return nil, chaterrors.ErrFailedGetParticipants
+		slog.Error("error failed get messages by chat_id", "chat_id", chatId, "since", since, "err", err)
+		return nil, errors.New("failed get messages")
 	}
 
-	slog.Debug("successfully get messages of chat",
-		"chat_id", chatID,
-		"messages_count", len(messages))
 	return messages, nil
 }
 

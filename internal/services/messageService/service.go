@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/sibhellyx/Messenger/internal/kafka"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
@@ -23,7 +24,7 @@ type MessageRepositoryInterface interface {
 type ChatRepositoryInterface interface {
 	GetChatById(chatID uint) (*entity.Chat, error)
 	GetParticipantByUserIdAndChatId(userID, chatID uint) (*entity.ChatParticipant, error)
-	GetMessagesByChatId(chatId uint) ([]*entity.Message, error)
+	GetMessagesByChatId(chatId uint, since *time.Time) ([]*entity.Message, error)
 }
 
 type MessageService struct {
@@ -184,7 +185,24 @@ func (s *MessageService) SendMessage(ctx context.Context, userID string, req req
 	return nil
 }
 
-func (s *MessageService) GetMessagesByChatId(userID, chatID string) ([]*entity.Message, error) {
+func (s *MessageService) GetMessagesByChatId(userID, chatID, sinceParam string) ([]*entity.Message, error) {
+	var since *time.Time
+	if sinceParam != "" {
+		parsedSince, parseErr := time.Parse(time.RFC3339, sinceParam)
+		if parseErr != nil {
+			timestamp, parseErr := strconv.ParseInt(sinceParam, 10, 64)
+			if parseErr != nil {
+				return nil, errors.New("invalid since parameter format, use RFC3339 or Unix timestamp")
+			}
+			parsedSince = time.Unix(timestamp, 0)
+		}
+
+		if parsedSince.After(time.Now()) {
+			return nil, errors.New("since parameter cannot be in the future")
+		}
+
+		since = &parsedSince
+	}
 	userId, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)
@@ -205,5 +223,5 @@ func (s *MessageService) GetMessagesByChatId(userID, chatID string) ([]*entity.M
 		slog.Error("failed get participant", "chat_id", chatID, "user_id", userId, "err", err)
 		return nil, errors.New("this user not participant of this chat")
 	}
-	return s.chatRepo.GetMessagesByChatId(uint(chatId))
+	return s.chatRepo.GetMessagesByChatId(uint(chatId), since)
 }

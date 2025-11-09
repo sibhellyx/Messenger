@@ -14,7 +14,7 @@ import (
 
 type MessageServiceInterface interface {
 	SendMessage(ctx context.Context, userID string, req request.CreateMessage) error
-	GetMessagesByChatId(userID, chatID string) ([]*entity.Message, error)
+	GetMessagesByChatId(userID, chatID, sinceParam string) ([]*entity.Message, error)
 }
 
 type MessageHandler struct {
@@ -57,6 +57,7 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 	}
 
 	chatID := c.Query("id")
+	sinceParam := c.Query("since")
 
 	if chatID == "" {
 		WrapError(c, errors.New("id of chat required"))
@@ -68,7 +69,7 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
-	messages, err := h.service.GetMessagesByChatId(userId.(string), chatID)
+	messages, err := h.service.GetMessagesByChatId(userId.(string), chatID, sinceParam)
 	if err != nil {
 		WrapError(c, err)
 		return
