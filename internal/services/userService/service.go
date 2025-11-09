@@ -144,6 +144,10 @@ func compareDates(date1, date2 *time.Time) bool {
 }
 
 func (s *UserService) GetFullInfoAboutUser(userID string) (*response.UserWithProfile, error) {
+	if userID == "" {
+		slog.Error("user_id is required")
+		return nil, errors.New("user_id can't be empty")
+	}
 	id, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
 		slog.Error("failed parse user_id to uint", "user_id", userID)

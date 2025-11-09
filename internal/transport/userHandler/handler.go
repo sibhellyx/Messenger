@@ -54,16 +54,12 @@ func (h *UserHandler) UpdateUserProfile(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserProfile(c *gin.Context) {
-	userID, exist := c.Get("user_id")
+	_, exist := c.Get("user_id")
 	if !exist {
 		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
-
-	profileUserID := c.Param("user_id")
-	if profileUserID == "" || profileUserID == "me" {
-		profileUserID = userID.(string)
-	}
+	profileUserID := c.Query("user_id")
 
 	userInfo, err := h.service.GetFullInfoAboutUser(profileUserID)
 	if err != nil {
