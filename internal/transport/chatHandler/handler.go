@@ -22,6 +22,7 @@ type ChatServiceInterface interface {
 	UpdateParticipant(userID string, req request.ParticipantUpdateRequest) error
 	GetChatParticipants(chatID, sinceParam string) ([]*entity.ChatParticipant, error)
 	LeaveFromChat(chatID string, userID string) error
+	EnterToChat(userID string, req request.ChatRequest) error
 }
 
 type ChatHandler struct {
@@ -267,6 +268,30 @@ func (h *ChatHandler) AddParticipant(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user_id": req.UserId,
+	})
+}
+
+// enter to chat
+func (h *ChatHandler) EnterToChat(c *gin.Context) {
+	userId, exist := c.Get("user_id")
+	if !exist {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+	var req request.ChatRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+
+	err = h.service.EnterToChat(userId.(string), req)
+	if err != nil {
+		WrapError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"result": "you enter to chat",
 	})
 }
 

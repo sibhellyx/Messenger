@@ -8,6 +8,8 @@ var (
 	ErrUserNotFound                    = errors.New("user not found")
 	ErrChatNotFound                    = errors.New("chat not found")
 	ErrChatIsDirected                  = errors.New("chat is directed, can't add participant")
+	ErrChatIsDirectedEnter             = errors.New("chat is directed, you can't enter to direct chat")
+	ErrChatIsPrivateEnter              = errors.New("chat is private, you can't enter to private chat")
 	ErrAlreadyParticipant              = errors.New("user is already a participant of this chat")
 	ErrNotParticipant                  = errors.New("user is not a participant of this chat")
 	ErrCreatingChatWithYourself        = errors.New("failed creating a chat with yourself")
@@ -26,6 +28,7 @@ var (
 	ErrFailedRemoveParticipantByMember = errors.New("failed remove user, member can't remove participants")
 	ErrFailedRemoveAdminOrOwnerByAdmin = errors.New("failed remove user, admin can't remove another admins or owner")
 	ErrFailedUpdateParticipant         = errors.New("failed update participant")
+	ErrFailedCheckParticipant          = errors.New("failed to check participant")
 
 	// service layer
 	ErrInvalidUser             = errors.New("invalid user_id")

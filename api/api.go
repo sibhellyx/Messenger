@@ -29,6 +29,7 @@ type ChatHandlerInterface interface {
 	LeaveChat(c *gin.Context)
 	RemoveParticipant(c *gin.Context)
 	UpdateParticipant(c *gin.Context)
+	EnterToChat(c *gin.Context)
 }
 
 type UserHandlerInterface interface {
@@ -76,6 +77,7 @@ func CreateRoutes(
 	r.POST("/chat/leave", middleware.AuthMiddleware(m, repo), chatHandler.LeaveChat)
 	r.DELETE("/chat/remove", middleware.AuthMiddleware(m, repo), chatHandler.RemoveParticipant)
 	r.PUT("/chat/participant", middleware.AuthMiddleware(m, repo), chatHandler.UpdateParticipant)
+	r.POST("/chat/enter", middleware.AuthMiddleware(m, repo), chatHandler.EnterToChat)
 
 	// message sender handler
 	r.POST("/message/send", middleware.AuthMiddleware(m, repo), messageHandler.SendMessage)

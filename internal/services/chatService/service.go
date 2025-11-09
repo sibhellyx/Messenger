@@ -322,6 +322,61 @@ func (s *ChatService) AddParticipant(userID string, req request.ParticipantReque
 	return nil
 }
 
+func (s *ChatService) EnterToChat(userID string, req request.ChatRequest) error {
+	slog.Debug("user enter to chat", "user_id", userID, "chat_id", req.Id)
+
+	err := req.Validate()
+	if err != nil {
+		slog.Error("failed validate request", "error", err)
+		return err
+	}
+	chatId, err := strconv.ParseUint(req.Id, 10, 32)
+	if err != nil {
+		slog.Error("failed parse chat_id to uint", "chat_id", req.Id)
+		return chaterrors.ErrInvalidChat
+	}
+
+	userId, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		slog.Error("failed parse user_id to uint", "user_id", userID)
+		return chaterrors.ErrInvalidUser
+	}
+	if !s.repository.UserExist(uint(userId)) {
+		slog.Warn("user not found", "user_id", userID)
+		return chaterrors.ErrUserNotFound
+	}
+	chat, err := s.repository.GetChatById(uint(chatId))
+	if err != nil || chat == nil {
+		slog.Error("failed found chat with this id", "chat_id", chat.ID)
+		return chaterrors.ErrChatNotFound
+	}
+	if chat.Type == entity.ChatTypeDirect {
+		slog.Error("user can't enter to direct chat", "user_id", userID, "chat_id", chat.ID)
+		return chaterrors.ErrChatIsDirected
+	}
+	if chat.IsPrivate {
+		slog.Error("user can't enter to private chat", "user_id", userID, "chat_id", chat.ID)
+		return chaterrors.ErrChatIsPrivateEnter
+	}
+	if !s.repository.CheckAvailibleForAddParticipantToChat(chat.ID) {
+		slog.Warn("chat is full", "chat_id", chatId)
+		return chaterrors.ErrFullChat
+	}
+
+	if s.repository.ParticipantExist(uint(userId), uint(chatId)) {
+		slog.Error("user can't enter to chat because already participant", "user_id", userID, "chat_id", chat.ID, "err", err)
+		return chaterrors.ErrAlreadyParticipant
+	}
+
+	participant := entity.ChatParticipant{
+		UserID: uint(userId),
+		ChatID: uint(chatId),
+		Role:   entity.RoleMember,
+	}
+
+	return s.repository.AddParticipant(participant)
+}
+
 func (s *ChatService) RemoveParticipant(userID string, req request.ParticipantRequest) error {
 	slog.Debug("remove participant from chat", "chat_id", req.Id, "user_id", userID, "participant_id(for delete)", req.UserId)
 
