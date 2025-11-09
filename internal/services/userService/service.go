@@ -13,6 +13,7 @@ import (
 
 type UserRepositoryInterface interface {
 	GetUsers(search string) ([]*entity.User, error)
+	GetUsersWithProfiles(search string) ([]*response.UserWithProfile, error)
 	UpdateProfile(profile entity.UserProfile) error
 	GetUserById(userId uint) (*entity.User, error)
 	GetFullInfoAboutUser(userId uint) (*response.UserWithProfile, error)
@@ -37,6 +38,16 @@ func (s *UserService) GetUsers(search string) ([]*entity.User, error) {
 
 	for _, user := range users {
 		user.Password = ""
+	}
+
+	return users, nil
+}
+
+func (s *UserService) GetUsersWithProfiles(search string) ([]*response.UserWithProfile, error) {
+	users, err := s.repository.GetUsersWithProfiles(search)
+	if err != nil {
+		slog.Error("failed to get users from repository", "error", err)
+		return nil, err
 	}
 
 	return users, nil

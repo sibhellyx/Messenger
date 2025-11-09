@@ -33,6 +33,7 @@ type ChatHandlerInterface interface {
 
 type UserHandlerInterface interface {
 	GetUsers(c *gin.Context)
+	GetUsersWithProfiles(c *gin.Context)
 	UpdateUserProfile(c *gin.Context)
 	GetUserProfile(c *gin.Context)
 	GetMyProfile(c *gin.Context)
@@ -82,6 +83,7 @@ func CreateRoutes(
 
 	// users
 	r.GET("/users", middleware.AuthMiddleware(m, repo), userHandler.GetUsers)
+	r.GET("/users/full", middleware.AuthMiddleware(m, repo), userHandler.GetUsersWithProfiles)
 	r.GET("/my", middleware.AuthMiddleware(m, repo), userHandler.GetMyProfile)
 	r.GET("/profile", middleware.AuthMiddleware(m, repo), userHandler.GetUserProfile)
 	r.PUT("/profile", middleware.AuthMiddleware(m, repo), userHandler.UpdateUserProfile)

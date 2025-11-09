@@ -40,6 +40,43 @@ func (r *UserRepository) GetUsers(search string) ([]*entity.User, error) {
 	return users, nil
 }
 
+func (r *UserRepository) GetUsersWithProfiles(search string) ([]*response.UserWithProfile, error) {
+	var userProfiles []*entity.UserProfile
+
+	query := r.db.Preload("User").
+		Joins("JOIN users ON user_profiles.user_id = users.id").
+		Where("users.deleted_at IS NULL")
+
+	if search != "" {
+		searchPattern := "%" + strings.ToLower(search) + "%"
+		query = query.Where("LOWER(users.name) LIKE ? OR LOWER(users.surname) LIKE ? OR LOWER(users.tgname) LIKE ?",
+			searchPattern, searchPattern, searchPattern)
+	}
+
+	result := query.Find(&userProfiles)
+	if result.Error != nil {
+		slog.Error("failed to get users with profiles", "error", result.Error, "search", search)
+		return nil, errors.New("failed to get users with profiles")
+	}
+
+	usersWithProfiles := make([]*response.UserWithProfile, 0, len(userProfiles))
+
+	for _, profile := range userProfiles {
+		userWithProfile := &response.UserWithProfile{
+			UserID:      profile.User.ID,
+			Name:        profile.User.Name,
+			Surname:     profile.User.Surname,
+			Tgname:      profile.User.Tgname,
+			Avatar:      profile.Avatar,
+			Bio:         profile.Bio,
+			DateOfBirth: profile.DateOfBirth,
+		}
+		usersWithProfiles = append(usersWithProfiles, userWithProfile)
+	}
+
+	return usersWithProfiles, nil
+}
+
 func (r *UserRepository) UpdateProfile(profile entity.UserProfile) error {
 	updates := map[string]interface{}{
 		"avatar":        profile.Avatar,
