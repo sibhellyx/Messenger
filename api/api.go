@@ -61,7 +61,7 @@ func CreateRoutes(
 	r.POST("/register", authHandler.Register)
 	r.POST("/login", authHandler.SignIn)
 	r.POST("/login/verify", authHandler.VerifyLogin)
-	r.POST("/refresh", middleware.AuthMiddleware(m, repo), authHandler.RefreshToken)
+	r.POST("/refresh", middleware.AuthMiddlewareForRefresh(m, repo), authHandler.RefreshToken)
 	r.POST("/logout", middleware.AuthMiddleware(m, repo), authHandler.LogoutUser)
 
 	// chat enpoints

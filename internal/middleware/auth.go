@@ -12,6 +12,7 @@ import (
 
 type JwtManagerInterface interface {
 	Parse(accessToken string) (payload.JwtPayload, error)
+	ParseIgnoreExpiration(accessToken string) (payload.JwtPayload, error)
 }
 
 type SessionRepositoryInterface interface {
@@ -36,6 +37,47 @@ func AuthMiddleware(m JwtManagerInterface, s SessionRepositoryInterface) gin.Han
 
 		token = strings.TrimPrefix(token, "Bearer ")
 		payload, err := m.Parse(token)
+		if err != nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		session, err := s.GetSessionByUuid(payload.Uuid)
+		if err != nil || session == nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Session not found"})
+			return
+		}
+
+		if time.Now().After(session.ExpiresAt) {
+			s.DeleteSessionByUuid(payload.Uuid)
+			c.AbortWithStatusJSON(401, gin.H{"error": "Session expired"})
+			return
+		}
+
+		c.Set("uuid", payload.Uuid)
+		c.Set("user_id", payload.UserId)
+
+		c.Next()
+	}
+}
+
+func AuthMiddlewareForRefresh(m JwtManagerInterface, s SessionRepositoryInterface) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		token := c.GetHeader("Authorization")
+		if !strings.HasPrefix(token, "Bearer ") {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Invalid authorization header"})
+			return
+		}
+
+		if token == "" {
+			slog.Warn("missing authorization header")
+			c.AbortWithStatusJSON(401, gin.H{"error": "Authorization header required"})
+			return
+		}
+
+		token = strings.TrimPrefix(token, "Bearer ")
+		payload, err := m.ParseIgnoreExpiration(token)
 		if err != nil {
 			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 			return
