@@ -129,10 +129,10 @@ func (srv *Server) Serve() {
 	bot.RegisterAction("start", actions.HandleStart())
 	authService.SetBotService(bot)
 
-	slog.Debug("connecting to chat service")
-	chatService := chatservice.NewChatService(chatRepository)
 	slog.Debug("connecting to ws service")
 	wsService := wsservice.NewWsService(hub)
+	slog.Debug("connecting to chat service")
+	chatService := chatservice.NewChatService(chatRepository, wsService)
 	slog.Debug("connecting to message service")
 	messageService := messageservice.NewMessageService(wsService, producer, messageRepository, chatRepository)
 	slog.Debug("connecting to user service")

@@ -1,6 +1,7 @@
 package chatservice
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/sibhellyx/Messenger/internal/models/chaterrors"
 	"github.com/sibhellyx/Messenger/internal/models/entity"
 	"github.com/sibhellyx/Messenger/internal/models/request"
+	"github.com/sibhellyx/Messenger/internal/models/wsmsg"
 )
 
 type ChatRepositoryInterface interface {
@@ -56,13 +58,19 @@ type ChatRepositoryInterface interface {
 	UserExist(userID uint) bool
 }
 
-type ChatService struct {
-	repository ChatRepositoryInterface
+type WsServiceInterface interface {
+	BroadcastMessage(msg []byte) error
 }
 
-func NewChatService(repository ChatRepositoryInterface) *ChatService {
+type ChatService struct {
+	repository ChatRepositoryInterface
+	service    WsServiceInterface
+}
+
+func NewChatService(repository ChatRepositoryInterface, service WsServiceInterface) *ChatService {
 	return &ChatService{
 		repository: repository,
+		service:    service,
 	}
 }
 
@@ -204,6 +212,19 @@ func (s *ChatService) DeleteChat(userID string, req request.ChatRequest) error {
 		return err
 	}
 
+	msg := wsmsg.ParticipantMsg{
+		ChatID: uint(chatId),
+		Type:   "participant",
+		Action: wsmsg.ChatDeleted,
+	}
+
+	responseByte, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal message", "chat_id", chatId, "error", err)
+	}
+
+	s.service.BroadcastMessage(responseByte)
+
 	slog.Debug("deleting chat completed", "chat_id", chatId)
 	return nil
 }
@@ -318,7 +339,6 @@ func (s *ChatService) AddParticipant(userID string, req request.ParticipantReque
 		slog.Warn("failed add member", "error", err)
 		return err
 	}
-
 	return nil
 }
 
@@ -373,8 +393,24 @@ func (s *ChatService) EnterToChat(userID string, req request.ChatRequest) error 
 		ChatID: uint(chatId),
 		Role:   entity.RoleMember,
 	}
+	err = s.repository.AddParticipant(participant)
+	if err != nil {
+		return err
+	}
+	msg := wsmsg.ParticipantMsg{
+		ChatID: uint(chatId),
+		UserID: uint(userId),
+		Type:   "participant",
+		Action: wsmsg.Entered,
+	}
 
-	return s.repository.AddParticipant(participant)
+	responseByte, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal message", "chat_id", req.Id, "user_id", userId, "error", err)
+	}
+
+	s.service.BroadcastMessage(responseByte)
+	return nil
 }
 
 func (s *ChatService) RemoveParticipant(userID string, req request.ParticipantRequest) error {
@@ -435,7 +471,26 @@ func (s *ChatService) RemoveParticipant(userID string, req request.ParticipantRe
 		slog.Error("failed remove user from chat, admin can't remove another admins or owner", "chat_id", req.Id, "user_id", userID, "participant_id(for delete)", req.UserId)
 		return chaterrors.ErrFailedRemoveAdminOrOwnerByAdmin
 	}
-	return s.repository.DeleteFromChat(uint(chatId), uint(participantId))
+
+	err = s.repository.DeleteFromChat(uint(chatId), uint(participantId))
+	if err != nil {
+		return err
+	}
+
+	msg := wsmsg.ParticipantMsg{
+		ChatID: uint(chatId),
+		UserID: uint(userId),
+		Type:   "participant",
+		Action: wsmsg.Removed,
+	}
+
+	responseByte, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal message", "chat_id", chatId, "user_id", userId, "error", err)
+	}
+
+	s.service.BroadcastMessage(responseByte)
+	return nil
 }
 
 func (s *ChatService) addParticipant(chatID, userID uint, role entity.ParticipantRole) error {
@@ -471,7 +526,22 @@ func (s *ChatService) addParticipant(chatID, userID uint, role entity.Participan
 		Role:   role,
 	}
 
-	return s.repository.AddParticipant(participant)
+	err := s.repository.AddParticipant(participant)
+	if err != nil {
+		return err
+	}
+	msg := wsmsg.ParticipantMsg{
+		ChatID: uint(chatID),
+		UserID: uint(userID),
+		Type:   "participant",
+		Action: wsmsg.Add,
+	}
+	responseByte, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal message", "chat_id", chatID, "user_id", userID, "error", err)
+	}
+	s.service.BroadcastMessage(responseByte)
+	return nil
 }
 
 func (s *ChatService) GetChatParticipants(chatID, sinceParam string) ([]*entity.ChatParticipant, error) {
@@ -552,7 +622,26 @@ func (s *ChatService) LeaveFromChat(chatID string, userID string) error {
 	}
 	slog.Debug("user sucsessfuly leaved from chat", "chat_id", chatID, "user_id", userID)
 
-	return s.repository.DeleteFromChat(uint(chatId), uint(userId))
+	err = s.repository.DeleteFromChat(uint(chatId), uint(userId))
+	if err != nil {
+		return err
+	}
+
+	msg := wsmsg.ParticipantMsg{
+		ChatID: uint(chatId),
+		UserID: uint(userId),
+		Type:   "participant",
+		Action: wsmsg.Leaved,
+	}
+
+	responseByte, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal message", "chat_id", chatId, "user_id", userId, "error", err)
+	}
+
+	s.service.BroadcastMessage(responseByte)
+
+	return nil
 }
 
 func (s *ChatService) UpdateParticipant(userID string, req request.ParticipantUpdateRequest) error {
