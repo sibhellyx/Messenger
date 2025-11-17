@@ -9,16 +9,17 @@ import (
 )
 
 type Client struct {
-	ID        string
-	UUID      string
-	Conn      *websocket.Conn
-	Send      chan []byte
-	UserAgent string
-	LastIP    string
-	hub       *Hub
-	done      chan struct{}
-	mu        sync.RWMutex
-	isActive  bool
+	ID           string
+	UUID         string
+	Conn         *websocket.Conn
+	Send         chan []byte
+	UserAgent    string
+	LastIP       string
+	hub          *Hub
+	done         chan struct{}
+	mu           sync.RWMutex
+	isActive     bool
+	lastActivity time.Time
 }
 
 func NewClient(
@@ -30,15 +31,16 @@ func NewClient(
 	hub *Hub,
 ) *Client {
 	return &Client{
-		ID:        id,
-		UUID:      uuid,
-		Conn:      conn,
-		Send:      make(chan []byte, 256),
-		UserAgent: userAgent,
-		LastIP:    lastIp,
-		hub:       hub,
-		done:      make(chan struct{}),
-		isActive:  true,
+		ID:           id,
+		UUID:         uuid,
+		Conn:         conn,
+		Send:         make(chan []byte, 256),
+		UserAgent:    userAgent,
+		LastIP:       lastIp,
+		hub:          hub,
+		done:         make(chan struct{}),
+		isActive:     true,
+		lastActivity: time.Now(),
 	}
 }
 
@@ -147,6 +149,9 @@ func (c *Client) WritePump() {
 		"ping_interval", c.hub.config.PingPeriod)
 
 	var sentMessages int
+	var consecutivePingFailures int
+	maxConsecutivePingFailures := 3
+
 	for {
 		select {
 		case message, ok := <-c.Send:
@@ -158,29 +163,16 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
+			err := c.Conn.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
-				slog.Warn("Failed to create WebSocket writer",
-					"client_id", c.ID,
-					"error", err)
-				return
-			}
-
-			if _, err := w.Write(message); err != nil {
 				slog.Warn("Failed to write message",
 					"client_id", c.ID,
 					"error", err)
 				return
 			}
 
-			if err := w.Close(); err != nil {
-				slog.Warn("Failed to close WebSocket writer",
-					"client_id", c.ID,
-					"error", err)
-				return
-			}
-
 			sentMessages++
+			c.updateLastActivity()
 			slog.Debug("Message sent to client",
 				"client_id", c.ID,
 				"message_size", len(message),
@@ -188,14 +180,56 @@ func (c *Client) WritePump() {
 
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
-			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				slog.Debug("Failed to send ping",
+
+			err := c.Conn.WriteMessage(websocket.PingMessage, nil)
+			if err != nil {
+				consecutivePingFailures++
+				slog.Warn("Failed to send ping",
 					"client_id", c.ID,
-					"error", err)
-				return
+					"error", err,
+					"consecutive_failures", consecutivePingFailures)
+
+				if consecutivePingFailures >= maxConsecutivePingFailures {
+					slog.Info("Max ping failures reached, closing connection",
+						"client_id", c.ID,
+						"failures", consecutivePingFailures)
+					return
+				}
+			} else {
+				consecutivePingFailures = 0
+				c.updateLastActivity()
+				slog.Debug("Ping sent successfully",
+					"client_id", c.ID,
+					"consecutive_failures", consecutivePingFailures)
 			}
-			slog.Debug("Ping sent",
-				"client_id", c.ID)
+
+			c.Conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+			_, _, err = c.Conn.ReadMessage()
+			if err != nil {
+				if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					consecutivePingFailures++
+					slog.Warn("Failed to read pong response",
+						"client_id", c.ID,
+						"error", err,
+						"consecutive_failures", consecutivePingFailures)
+
+					if consecutivePingFailures >= maxConsecutivePingFailures {
+						return
+					}
+				}
+			}
 		}
 	}
+}
+
+func (c *Client) updateLastActivity() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastActivity = time.Now()
+}
+
+func (c *Client) GetLastActivity() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.lastActivity
 }
