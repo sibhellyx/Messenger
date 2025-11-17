@@ -479,7 +479,7 @@ func (s *ChatService) RemoveParticipant(userID string, req request.ParticipantRe
 
 	msg := wsmsg.ParticipantMsg{
 		ChatID: uint(chatId),
-		UserID: uint(userId),
+		UserID: uint(participantId),
 		Type:   "participant",
 		Action: wsmsg.Removed,
 	}
